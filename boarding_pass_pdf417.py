@@ -10,23 +10,19 @@ AVIATION_EDGE_API_KEY = "56e9c3-1bef36"  # Your provided Aviation Edge API key
 FLIGHT_SCHEDULES_URL = "https://aviation-edge.com/v2/public/flights"
 
 # Function to query the Flight Schedules API
-def get_flight_schedule(flight_number, airline_code, flight_date):
-    # Normalize flight number by removing leading zeros
-    normalized_flight_number = flight_number.lstrip("0")  # Strip leading zeros
+def get_flight_schedule(flight_iata, flight_date):
     params = {
         "key": AVIATION_EDGE_API_KEY,
         "depIata": "SIN",  # Hardcoded for Singapore departures
-        "flightIata": normalized_flight_number,  # Use normalized flight number
-        "airlineIata": airline_code,            # Include airline code for precise matching
+        "flightIata": flight_iata,  # Combined airline code and flight number
     }
     try:
         response = requests.get(FLIGHT_SCHEDULES_URL, params=params)
         response.raise_for_status()
         flights = response.json()
 
-        # Debugging: Log normalized flight number, airline code, and API response
-        st.write("Normalized Flight Number:", normalized_flight_number)
-        st.write("Airline Code:", airline_code)
+        # Debugging: Log the combined flight identifier and API response
+        st.write("Flight Identifier (IATA):", flight_iata)
         st.write("API Response:", flights)
 
         # Handle "No Record Found" error
@@ -60,10 +56,12 @@ def parse_iata_barcode(barcode):
         year = datetime.now().year
         flight_date = datetime(year, 1, 1) + timedelta(days=julian_date - 1)
 
+        # Combine airline code and flight number
+        flight_iata = f"{airline_code}{flight_number.lstrip('0')}"  # Remove leading zeros
+
         return {
             "Passenger Name": passenger_name,
-            "Airline Code": airline_code,
-            "Flight Number": flight_number,
+            "Flight Identifier (IATA)": flight_iata,
             "Flight Date": flight_date.date(),
             "Seat Number": seat_number,
         }, None
@@ -97,15 +95,13 @@ if st.session_state.parsed_data:
 
     # Debugging: Display parsed parameters
     st.write("Parsed Parameters:", {
-        "Flight Number": st.session_state.parsed_data["Flight Number"],
-        "Airline Code": st.session_state.parsed_data["Airline Code"],
+        "Flight Identifier (IATA)": st.session_state.parsed_data["Flight Identifier (IATA)"],
         "Flight Date": st.session_state.parsed_data["Flight Date"],
     })
 
     # Fetch flight schedule from API
     flight_schedule = get_flight_schedule(
-        st.session_state.parsed_data["Flight Number"],
-        st.session_state.parsed_data["Airline Code"],
+        st.session_state.parsed_data["Flight Identifier (IATA)"],
         st.session_state.parsed_data["Flight Date"],
     )
 
