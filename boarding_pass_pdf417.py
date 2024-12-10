@@ -1,5 +1,7 @@
+import streamlit as st
 import requests
 import pandas as pd
+from io import BytesIO
 from datetime import datetime
 
 # API Configuration
@@ -13,43 +15,60 @@ today = datetime.now().strftime('%Y-%m-%d')
 # API endpoint
 url = f'https://aviation-edge.com/v2/public/timetable'
 
-# Parameters
-params = {
-    'key': API_KEY,
-    'iataCode': IATA_CODE,
-    'type': TYPE
-}
+# Function to fetch departure data
+def fetch_departures():
+    params = {
+        'key': API_KEY,
+        'iataCode': IATA_CODE,
+        'type': TYPE,
+    }
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        flights = response.json()
 
-# Make the request
-try:
-    response = requests.get(url, params=params)
-    response.raise_for_status()
-    data = response.json()
+        # Filter flights departing today
+        departures = []
+        for flight in flights:
+            dep_time = flight.get('departure', {}).get('scheduledTime')
+            if dep_time and dep_time.startswith(today):  # Check if time exists and matches today's date
+                departures.append({
+                    'Flight Number': flight.get('flight', {}).get('iataNumber', 'N/A'),
+                    'Airline': flight.get('airline', {}).get('name', 'N/A'),
+                    'Destination': flight.get('arrival', {}).get('iataCode', 'N/A'),
+                    'Scheduled Time': dep_time,
+                    'Status': flight.get('status', 'N/A')
+                })
+        return departures
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching departure details: {e}")
+        return None
 
-    # Filter flights departing today
-    today_departures = []
-    for flight in data:
-        # Safely access 'scheduledTime' and skip flights with missing data
-        dep_time = flight.get('departure', {}).get('scheduledTime')
-        if dep_time and dep_time.startswith(today):  # Check if the time exists and matches today
-            today_departures.append({
-                'Flight Number': flight.get('flight', {}).get('iataNumber', 'N/A'),
-                'Airline': flight.get('airline', {}).get('name', 'N/A'),
-                'Destination': flight.get('arrival', {}).get('iataCode', 'N/A'),
-                'Scheduled Time': dep_time,
-                'Status': flight.get('status', 'N/A')
-            })
+# Streamlit Interface
+st.title("Fetch and Download Today's Departures")
 
-    # Check if any departures were found
-    if today_departures:
-        # Create a DataFrame
-        df = pd.DataFrame(today_departures)
-        # Save to Excel
-        file_name = f'SIN_Departures_{today}.xlsx'
-        df.to_excel(file_name, index=False)
-        print(f'Data successfully saved to {file_name}')
+if st.button("Fetch Departures"):
+    departures = fetch_departures()
+    if departures:
+        # Convert to DataFrame
+        df = pd.DataFrame(departures)
+
+        # Display data in the app
+        st.write(f"Fetched {len(departures)} departures.")
+        st.dataframe(df)
+
+        # Create Excel file in memory
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Departures')
+        output.seek(0)
+
+        # Provide download button
+        st.download_button(
+            label="Download Excel File",
+            data=output,
+            file_name=f"SIN_Departures_{today}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
     else:
-        print("No departures found for today.")
-
-except requests.exceptions.RequestException as e:
-    print(f'Error fetching departure details: {e}')
+        st.warning("No departures found for today.")
