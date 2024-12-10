@@ -53,15 +53,47 @@ def fetch_flight_departure(flight_iata, departure_airport="SIN"):
                     "Airline": flight.get("airline", {}).get("name", "N/A"),
                     "Destination": flight.get("arrival", {}).get("iataCode", "N/A"),
                     "Scheduled Departure Time": flight.get("departure", {}).get("scheduledTime", "N/A"),
-                    "Status": flight.get("status", "N/A")
+                    "Status": flight.get("status", "N/A"),
+                    "Departure Airport": departure_airport,
                 }
         return None
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching departure details: {e}")
         return None
 
+# Function to validate flight details
+def validate_flight(flight_details):
+    validation_messages = []
+
+    # Check if departure is from SIN
+    if flight_details.get("Departure Airport") != "SIN":
+        validation_messages.append("Alert: Departure is not from SIN!")
+
+    # Check if flight is today
+    flight_date = datetime.strptime(
+        flight_details.get("Scheduled Departure Time", "").split("T")[0],
+        "%Y-%m-%d"
+    ).date()
+    current_date = datetime.now().date()
+    if flight_date != current_date:
+        validation_messages.append(
+            f"Alert: Flight date is not today! (Flight Date: {flight_date}, Today's Date: {current_date})"
+        )
+
+    # Check if flight is within the next 24 hours
+    flight_time_str = flight_details.get("Scheduled Departure Time", "").replace("T", " ")
+    flight_datetime = datetime.strptime(flight_time_str, "%Y-%m-%d %H:%M:%S")
+    current_time = datetime.now()
+    time_difference = flight_datetime - current_time
+    if not (0 <= time_difference.total_seconds() <= 86400):  # 24 hours in seconds
+        validation_messages.append(
+            f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime}, Current Time: {current_time})"
+        )
+
+    return validation_messages
+
 # Streamlit Interface
-st.title("Boarding Pass Validator with Departure Search")
+st.title("Boarding Pass Validator with Flight Checks")
 
 # Scan boarding pass barcode
 barcode_data = st.text_input(
@@ -70,7 +102,7 @@ barcode_data = st.text_input(
 )
 
 # Fetch and Display Results
-if st.button("Scan and Search"):
+if st.button("Scan and Validate"):
     if barcode_data:
         # Parse the barcode
         parsed_data, error = parse_iata_barcode(barcode_data)
@@ -83,6 +115,14 @@ if st.button("Scan and Search"):
             if flight_details:
                 st.subheader("Flight Departure Details")
                 st.json(flight_details)
+
+                # Validate flight details
+                validation_results = validate_flight(flight_details)
+                if validation_results:
+                    for alert in validation_results:
+                        st.error(alert)
+                else:
+                    st.success("Flight details are valid!")
             else:
                 st.warning("No departure details found for this flight.")
         else:
