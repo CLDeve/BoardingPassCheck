@@ -63,26 +63,26 @@ def parse_iata_barcode(barcode):
 if "parsed_data" not in st.session_state:
     st.session_state.parsed_data = None
     st.session_state.error_message = None
-    st.session_state.last_barcode = ""
-
-# Callback to process and clear input
-def process_and_clear_input():
-    barcode_data = st.session_state.barcode_input
-    if barcode_data and barcode_data != st.session_state.last_barcode:
-        st.session_state.last_barcode = barcode_data
-        st.session_state.parsed_data, st.session_state.error_message = parse_iata_barcode(barcode_data)
-    st.session_state.barcode_input = ""
+    st.session_state.scanned_info = ""
 
 # Input field for barcode
-st.text_input(
+barcode_data = st.text_input(
     "Scan the barcode here:",
     placeholder="Place the cursor here and scan your boarding pass...",
-    key="barcode_input",
-    on_change=process_and_clear_input,
 )
+
+# Scan button
+if st.button("Scan"):
+    if barcode_data:
+        # Parse the barcode
+        st.session_state.parsed_data, st.session_state.error_message = parse_iata_barcode(barcode_data)
+        st.session_state.scanned_info = barcode_data
+    else:
+        st.error("Please scan a barcode before clicking the 'Scan' button.")
 
 # Display parsed results or errors
 if st.session_state.parsed_data:
+    st.subheader("Parsed Boarding Pass Details:")
     st.json(st.session_state.parsed_data)
 
     # Fetch flight details from API
