@@ -10,21 +10,23 @@ AVIATION_EDGE_API_KEY = "56e9c3-1bef36"  # Your provided Aviation Edge API key
 FLIGHT_SCHEDULES_URL = "https://aviation-edge.com/v2/public/flights"
 
 # Function to query the Flight Schedules API
-def get_flight_schedule(departure_airport, flight_number, flight_date):
+def get_flight_schedule(departure_airport, flight_number, airline_code, flight_date):
     # Normalize flight number by removing leading zeros
     normalized_flight_number = flight_number.lstrip("0")  # Strip leading zeros
     params = {
         "key": AVIATION_EDGE_API_KEY,
         "depIata": departure_airport,
         "flightIata": normalized_flight_number,  # Use normalized flight number
+        "airlineIata": airline_code,            # Include airline code for precise matching
     }
     try:
         response = requests.get(FLIGHT_SCHEDULES_URL, params=params)
         response.raise_for_status()
         flights = response.json()
 
-        # Debugging: Log normalized flight number and API response
+        # Debugging: Log normalized flight number, airline code, and API response
         st.write("Normalized Flight Number:", normalized_flight_number)
+        st.write("Airline Code:", airline_code)
         st.write("API Response:", flights)
 
         # Handle "No Record Found" error
@@ -101,6 +103,7 @@ if st.session_state.parsed_data:
     st.write("Parsed Parameters:", {
         "Departure Airport": st.session_state.parsed_data["Departure Airport"],
         "Flight Number": st.session_state.parsed_data["Flight Number"],
+        "Airline Code": st.session_state.parsed_data["Airline Code"],
         "Flight Date": st.session_state.parsed_data["Flight Date"],
     })
 
@@ -108,6 +111,7 @@ if st.session_state.parsed_data:
     flight_schedule = get_flight_schedule(
         st.session_state.parsed_data["Departure Airport"],
         st.session_state.parsed_data["Flight Number"],
+        st.session_state.parsed_data["Airline Code"],
         st.session_state.parsed_data["Flight Date"],
     )
 
