@@ -1,8 +1,6 @@
 import streamlit as st
 import requests
-import pandas as pd
 from datetime import datetime, timedelta
-from io import BytesIO
 
 # API Configuration
 API_KEY = '56e9c3-1bef36'  # Your Aviation Edge API key
@@ -69,11 +67,21 @@ def validate_flight(flight_details):
     if flight_details.get("Departure Airport") != "SIN":
         validation_messages.append("Alert: Departure is not from SIN!")
 
-    # Check if flight is today
-    flight_date = datetime.strptime(
-        flight_details.get("Scheduled Departure Time", "").split("T")[0],
-        "%Y-%m-%d"
-    ).date()
+    # Get and validate the scheduled departure time
+    scheduled_time = flight_details.get("Scheduled Departure Time", "")
+    if not scheduled_time:
+        validation_messages.append("Alert: Scheduled Departure Time is missing!")
+        return validation_messages
+
+    try:
+        # Parse the scheduled time
+        flight_datetime = datetime.strptime(scheduled_time.replace("T", " "), "%Y-%m-%d %H:%M:%S")
+    except ValueError as e:
+        validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
+        return validation_messages
+
+    # Check if flight date is today
+    flight_date = flight_datetime.date()
     current_date = datetime.now().date()
     if flight_date != current_date:
         validation_messages.append(
@@ -81,8 +89,6 @@ def validate_flight(flight_details):
         )
 
     # Check if flight is within the next 24 hours
-    flight_time_str = flight_details.get("Scheduled Departure Time", "").replace("T", " ")
-    flight_datetime = datetime.strptime(flight_time_str, "%Y-%m-%d %H:%M:%S")
     current_time = datetime.now()
     time_difference = flight_datetime - current_time
     if not (0 <= time_difference.total_seconds() <= 86400):  # 24 hours in seconds
