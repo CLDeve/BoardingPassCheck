@@ -3,44 +3,43 @@ import requests
 from datetime import datetime, timedelta
 
 # Title of the app
-st.title("Singapore Flight Validator with Flight Schedules")
+st.title("Singapore Departure Validator with Flight Schedules")
 
 # API Configuration
 AVIATION_EDGE_API_KEY = "56e9c3-1bef36"  # Your provided Aviation Edge API key
 FLIGHT_SCHEDULES_URL = "https://aviation-edge.com/v2/public/flights"
 
-# Function to query the Flight Schedules API
-def get_flight_schedule(flight_iata, flight_date):
+# Function to query the departure details API
+def get_departure_details(flight_iata, departure_airport, departure_date):
     params = {
         "key": AVIATION_EDGE_API_KEY,
-        "depIata": "SIN",  # Hardcoded for Singapore departures
-        "flightIata": flight_iata,  # Combined airline code and flight number
+        "depIata": departure_airport,  # Singapore (SIN)
+        "flightIata": flight_iata,    # Combined airline and flight number
     }
     try:
         response = requests.get(FLIGHT_SCHEDULES_URL, params=params)
         response.raise_for_status()
-        flights = response.json()
+        departures = response.json()
 
-        # Debugging: Log the combined flight identifier and API response
-        st.write("Flight Identifier (IATA):", flight_iata)
-        st.write("API Response:", flights)
+        # Debugging: Log the API response
+        st.write("API Response:", departures)
 
         # Handle "No Record Found" error
-        if not isinstance(flights, list) or flights.get("error") == "No Record Found":
-            st.error("No record found in the API. Please verify the flight details.")
+        if not isinstance(departures, list) or departures.get("error") == "No Record Found":
+            st.error("No record found for this departure. Please verify the flight details.")
             return None
 
-        # Filter results based on flight date
-        for flight in flights:
-            dep_time = flight.get("departure", {}).get("scheduledTime", None)
-            if dep_time and dep_time.startswith(flight_date.strftime("%Y-%m-%d")):
-                return flight
+        # Filter by departure date
+        for departure in departures:
+            dep_time = departure.get("departure", {}).get("scheduledTime", None)
+            if dep_time and dep_time.startswith(departure_date.strftime("%Y-%m-%d")):
+                return departure
 
-        # No matching flight found
-        st.warning("No matching flight found in the API for the provided date.")
+        # No matching departure found
+        st.warning("No matching departure found for the provided date.")
         return None
     except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching flight schedule: {e}")
+        st.error(f"Error fetching departure details: {e}")
         return None
 
 # Helper function to parse IATA boarding pass data
@@ -61,7 +60,8 @@ def parse_iata_barcode(barcode):
 
         return {
             "Passenger Name": passenger_name,
-            "Flight Identifier (IATA)": flight_iata,  # No spaces
+            "Flight Identifier (IATA)": flight_iata,
+            "Departure Airport": "SIN",  # Hardcoded for Singapore departures
             "Flight Date": flight_date.date(),
             "Seat Number": seat_number,
         }, None
@@ -96,16 +96,17 @@ if st.session_state.parsed_data:
     st.subheader("Parsed Boarding Pass Details:")
     st.json(st.session_state.parsed_data)
 
-    # Fetch flight schedule from API
-    flight_schedule = get_flight_schedule(
+    # Fetch departure details from API
+    departure_details = get_departure_details(
         st.session_state.parsed_data.get("Flight Identifier (IATA)", ""),
+        st.session_state.parsed_data.get("Departure Airport", ""),
         st.session_state.parsed_data.get("Flight Date"),
     )
 
-    if flight_schedule:
-        st.subheader("Flight Schedule from API:")
-        st.json(flight_schedule)
+    if departure_details:
+        st.subheader("Departure Details from API:")
+        st.json(departure_details)
     else:
-        st.warning("No flight schedule found for this flight.")
+        st.warning("No departure details found for this flight.")
 elif st.session_state.error_message:
     st.error(st.session_state.error_message)
