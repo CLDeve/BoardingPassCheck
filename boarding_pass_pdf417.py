@@ -3,19 +3,19 @@ import requests
 from datetime import datetime, timedelta
 
 # Title of the app
-st.title("IATA Boarding Pass Validator with Flight Schedules")
+st.title("Singapore Flight Validator with Flight Schedules")
 
 # API Configuration
 AVIATION_EDGE_API_KEY = "56e9c3-1bef36"  # Your provided Aviation Edge API key
 FLIGHT_SCHEDULES_URL = "https://aviation-edge.com/v2/public/flights"
 
 # Function to query the Flight Schedules API
-def get_flight_schedule(departure_airport, flight_number, airline_code, flight_date):
+def get_flight_schedule(flight_number, airline_code, flight_date):
     # Normalize flight number by removing leading zeros
     normalized_flight_number = flight_number.lstrip("0")  # Strip leading zeros
     params = {
         "key": AVIATION_EDGE_API_KEY,
-        "depIata": departure_airport,
+        "depIata": "SIN",  # Hardcoded for Singapore departures
         "flightIata": normalized_flight_number,  # Use normalized flight number
         "airlineIata": airline_code,            # Include airline code for precise matching
     }
@@ -51,8 +51,6 @@ def get_flight_schedule(departure_airport, flight_number, airline_code, flight_d
 def parse_iata_barcode(barcode):
     try:
         passenger_name = barcode[2:22].strip()  # Extract passenger name
-        departure_airport = barcode[30:33]     # Extract departure airport code
-        arrival_airport = barcode[33:36]       # Extract arrival airport code
         airline_code = barcode[36:39]          # Extract airline code
         flight_number = barcode[39:44].strip() # Extract flight number
         julian_date = int(barcode[44:47])      # Extract Julian date
@@ -64,8 +62,6 @@ def parse_iata_barcode(barcode):
 
         return {
             "Passenger Name": passenger_name,
-            "Departure Airport": departure_airport,
-            "Arrival Airport": arrival_airport,
             "Airline Code": airline_code,
             "Flight Number": flight_number,
             "Flight Date": flight_date.date(),
@@ -101,7 +97,6 @@ if st.session_state.parsed_data:
 
     # Debugging: Display parsed parameters
     st.write("Parsed Parameters:", {
-        "Departure Airport": st.session_state.parsed_data["Departure Airport"],
         "Flight Number": st.session_state.parsed_data["Flight Number"],
         "Airline Code": st.session_state.parsed_data["Airline Code"],
         "Flight Date": st.session_state.parsed_data["Flight Date"],
@@ -109,7 +104,6 @@ if st.session_state.parsed_data:
 
     # Fetch flight schedule from API
     flight_schedule = get_flight_schedule(
-        st.session_state.parsed_data["Departure Airport"],
         st.session_state.parsed_data["Flight Number"],
         st.session_state.parsed_data["Airline Code"],
         st.session_state.parsed_data["Flight Date"],
