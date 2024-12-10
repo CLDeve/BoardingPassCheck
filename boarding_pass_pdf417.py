@@ -11,17 +11,20 @@ FLIGHT_SCHEDULES_URL = "https://aviation-edge.com/v2/public/flights"
 
 # Function to query the Flight Schedules API
 def get_flight_schedule(departure_airport, flight_number, flight_date):
+    # Normalize flight number by removing leading zeros
+    normalized_flight_number = flight_number.lstrip("0")  # Strip leading zeros
     params = {
         "key": AVIATION_EDGE_API_KEY,
         "depIata": departure_airport,
-        "flightIata": flight_number,
+        "flightIata": normalized_flight_number,  # Use normalized flight number
     }
     try:
         response = requests.get(FLIGHT_SCHEDULES_URL, params=params)
         response.raise_for_status()
         flights = response.json()
 
-        # Debugging: Log API response
+        # Debugging: Log normalized flight number and API response
+        st.write("Normalized Flight Number:", normalized_flight_number)
         st.write("API Response:", flights)
 
         # Handle "No Record Found" error
