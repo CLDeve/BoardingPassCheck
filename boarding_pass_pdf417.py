@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 # API Configuration
-API_KEY = 'YOUR_API_KEY'  # Replace with your Aviation Edge API key
+API_KEY = '56e9c3-1bef36'  # Your Aviation Edge API key
 IATA_CODE = 'SIN'  # Singapore Changi Airport
 TYPE = 'departure'  # Fetch departures
 
@@ -21,28 +21,35 @@ params = {
 }
 
 # Make the request
-response = requests.get(url, params=params)
-
-# Check if the request was successful
-if response.status_code == 200:
+try:
+    response = requests.get(url, params=params)
+    response.raise_for_status()
     data = response.json()
+
     # Filter flights departing today
-    today_departures = [
-        {
-            'Flight Number': flight['flight']['iataNumber'],
-            'Airline': flight['airline']['name'],
-            'Destination': flight['arrival']['iataCode'],
-            'Scheduled Time': flight['departure']['scheduledTime'],
-            'Status': flight['status']
-        }
-        for flight in data
-        if flight['departure']['scheduledTime'].startswith(today)
-    ]
-    # Create a DataFrame
-    df = pd.DataFrame(today_departures)
-    # Save to Excel
-    file_name = f'SIN_Departures_{today}.xlsx'
-    df.to_excel(file_name, index=False)
-    print(f'Data successfully saved to {file_name}')
-else:
-    print(f'Failed to fetch data: {response.status_code} - {response.text}')
+    today_departures = []
+    for flight in data:
+        # Safely access 'scheduledTime' and skip flights with missing data
+        dep_time = flight.get('departure', {}).get('scheduledTime')
+        if dep_time and dep_time.startswith(today):  # Check if the time exists and matches today
+            today_departures.append({
+                'Flight Number': flight.get('flight', {}).get('iataNumber', 'N/A'),
+                'Airline': flight.get('airline', {}).get('name', 'N/A'),
+                'Destination': flight.get('arrival', {}).get('iataCode', 'N/A'),
+                'Scheduled Time': dep_time,
+                'Status': flight.get('status', 'N/A')
+            })
+
+    # Check if any departures were found
+    if today_departures:
+        # Create a DataFrame
+        df = pd.DataFrame(today_departures)
+        # Save to Excel
+        file_name = f'SIN_Departures_{today}.xlsx'
+        df.to_excel(file_name, index=False)
+        print(f'Data successfully saved to {file_name}')
+    else:
+        print("No departures found for today.")
+
+except requests.exceptions.RequestException as e:
+    print(f'Error fetching departure details: {e}')
