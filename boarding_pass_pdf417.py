@@ -74,7 +74,8 @@ def validate_flight(flight_details):
         return validation_messages
 
     try:
-        # Parse the scheduled time
+        # Remove fractional seconds if present
+        scheduled_time = scheduled_time.split(".")[0]  # Remove ".000" or similar
         flight_datetime = datetime.strptime(scheduled_time.replace("T", " "), "%Y-%m-%d %H:%M:%S")
     except ValueError as e:
         validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
