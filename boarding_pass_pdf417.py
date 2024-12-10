@@ -3,40 +3,36 @@ import requests
 from datetime import datetime, timedelta
 
 # Title of the app
-st.title("IATA Boarding Pass Validator with Flight Tracking")
+st.title("IATA Boarding Pass Validator with Flight Schedules")
 
 # API Configuration
 AVIATION_EDGE_API_KEY = "56e9c3-1bef36"  # Your provided Aviation Edge API key
-FLIGHT_TRACKER_URL = "https://aviation-edge.com/v2/public/timetable"
+FLIGHT_SCHEDULES_URL = "https://aviation-edge.com/v2/public/flights"
 
-# Function to query the API
-def get_flight_details(departure_airport, flight_number, flight_date):
+# Function to query the Flight Schedules API
+def get_flight_schedule(departure_airport, flight_number, flight_date):
     params = {
         "key": AVIATION_EDGE_API_KEY,
-        "iataCode": departure_airport,
-        "type": "departure",
+        "depIata": departure_airport,
+        "flightIata": flight_number,
     }
     try:
         # API Request
-        response = requests.get(FLIGHT_TRACKER_URL, params=params)
+        response = requests.get(FLIGHT_SCHEDULES_URL, params=params)
         response.raise_for_status()
         flights = response.json()
 
         # Debugging: Log the API response
         st.write("API Response:", flights)
 
-        # Filter results based on flight number and date
+        # Filter results based on date
         for flight in flights:
-            flight_num = flight["flight"]["iataNumber"]
-            scheduled_time = flight["departure"]["scheduledTime"]
-
-            # Match flight number and date
-            if (flight_num.endswith(flight_number) and
-                scheduled_time.startswith(flight_date.strftime("%Y-%m-%d"))):
+            dep_time = flight.get("departure", {}).get("scheduledTime", "")
+            if dep_time.startswith(flight_date.strftime("%Y-%m-%d")):
                 return flight
         return None
     except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching flight details: {e}")
+        st.error(f"Error fetching flight schedule: {e}")
         return None
 
 # Helper function to parse IATA boarding pass data
@@ -93,17 +89,17 @@ if st.session_state.parsed_data:
     st.subheader("Parsed Boarding Pass Details:")
     st.json(st.session_state.parsed_data)
 
-    # Fetch flight details from API
-    flight_details = get_flight_details(
+    # Fetch flight schedule from API
+    flight_schedule = get_flight_schedule(
         st.session_state.parsed_data["Departure Airport"],
         st.session_state.parsed_data["Flight Number"],
         st.session_state.parsed_data["Flight Date"],
     )
 
-    if flight_details:
-        st.subheader("Flight Details from API:")
-        st.json(flight_details)
+    if flight_schedule:
+        st.subheader("Flight Schedule from API:")
+        st.json(flight_schedule)
     else:
-        st.error("No flight details found for this flight.")
+        st.error("No flight schedule found for this flight.")
 elif st.session_state.error_message:
     st.error(st.session_state.error_message)
