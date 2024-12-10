@@ -17,7 +17,6 @@ def get_flight_schedule(departure_airport, flight_number, flight_date):
         "flightIata": flight_number,
     }
     try:
-        # API Request
         response = requests.get(FLIGHT_SCHEDULES_URL, params=params)
         response.raise_for_status()
         flights = response.json()
@@ -25,11 +24,15 @@ def get_flight_schedule(departure_airport, flight_number, flight_date):
         # Debugging: Log the API response
         st.write("API Response:", flights)
 
-        # Filter results based on date
+        if not isinstance(flights, list):
+            st.error("Unexpected API response format. Please check the API key or parameters.")
+            return None
+
         for flight in flights:
-            dep_time = flight.get("departure", {}).get("scheduledTime", "")
-            if dep_time.startswith(flight_date.strftime("%Y-%m-%d")):
+            dep_time = flight.get("departure", {}).get("scheduledTime", None)
+            if dep_time and dep_time.startswith(flight_date.strftime("%Y-%m-%d")):
                 return flight
+
         return None
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching flight schedule: {e}")
@@ -50,7 +53,6 @@ def parse_iata_barcode(barcode):
         year = datetime.now().year
         flight_date = datetime(year, 1, 1) + timedelta(days=julian_date - 1)
 
-        # Return parsed data and no error message
         return {
             "Passenger Name": passenger_name,
             "Departure Airport": departure_airport,
@@ -78,7 +80,6 @@ barcode_data = st.text_input(
 # Scan button
 if st.button("Scan"):
     if barcode_data:
-        # Parse the barcode
         st.session_state.parsed_data, st.session_state.error_message = parse_iata_barcode(barcode_data)
         st.session_state.scanned_info = barcode_data
     else:
