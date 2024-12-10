@@ -47,8 +47,8 @@ def get_flight_schedule(flight_iata, flight_date):
 def parse_iata_barcode(barcode):
     try:
         passenger_name = barcode[2:22].strip()  # Extract passenger name
-        airline_code = barcode[36:39]          # Extract airline code
-        flight_number = barcode[39:44].strip() # Extract flight number
+        airline_code = barcode[36:39].strip()  # Extract and strip airline code
+        flight_number = barcode[39:44].strip() # Extract and strip flight number
         julian_date = int(barcode[44:47])      # Extract Julian date
         seat_number = barcode[48:51].strip()   # Extract seat number
 
@@ -56,12 +56,12 @@ def parse_iata_barcode(barcode):
         year = datetime.now().year
         flight_date = datetime(year, 1, 1) + timedelta(days=julian_date - 1)
 
-        # Combine airline code and flight number
-        flight_iata = f"{airline_code}{flight_number.lstrip('0')}"  # Remove leading zeros
+        # Combine airline code and flight number (no spaces, remove leading zeros)
+        flight_iata = f"{airline_code}{flight_number.lstrip('0')}"
 
         return {
             "Passenger Name": passenger_name,
-            "Flight Identifier (IATA)": flight_iata,
+            "Flight Identifier (IATA)": flight_iata,  # No spaces
             "Flight Date": flight_date.date(),
             "Seat Number": seat_number,
         }, None
