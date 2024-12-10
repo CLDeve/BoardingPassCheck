@@ -1,67 +1,64 @@
 import streamlit as st
 import requests
 import pandas as pd
-from datetime import datetime
 
 # API Configuration
-AVIATION_EDGE_API_KEY = "56e9c3-1bef36"  # Your API key
-FLIGHT_SCHEDULES_URL = "https://aviation-edge.com/v2/public/flights"
+AVIATION_EDGE_API_KEY = "56e9c3-1bef36"  # Replace with your valid API key
+ENTIRE_DATASET_URL = f"https://aviation-edge.com/v2/public/schedules?key={AVIATION_EDGE_API_KEY}"
 
-# Function to fetch today's departures from Singapore (SIN)
-def fetch_today_departures():
-    today = datetime.now().strftime("%Y-%m-%d")  # Get today's date
+# Function to fetch entire dataset for departures
+def fetch_entire_departures():
     params = {
-        "key": AVIATION_EDGE_API_KEY,
-        "depIata": "SIN",  # Singapore airport code
+        "depIata": "SIN",  # Fetch departures from Singapore (SIN)
     }
     try:
-        response = requests.get(FLIGHT_SCHEDULES_URL, params=params)
+        response = requests.get(ENTIRE_DATASET_URL, params=params)
         response.raise_for_status()
         flights = response.json()
 
         # Check for valid data
-        if not isinstance(flights, list) or "error" in flights:
+        if not isinstance(flights, list):
             st.error("No departure data found or API error occurred.")
             return None
 
-        # Filter departures for today
-        today_departures = []
+        # Process the data
+        departures = []
         for flight in flights:
-            dep_time = flight.get("departure", {}).get("scheduledTime", "")
-            if dep_time.startswith(today):
-                today_departures.append({
-                    "Flight Number": flight.get("flight", {}).get("iata", ""),
-                    "Airline": flight.get("airline", {}).get("name", ""),
-                    "Destination": flight.get("arrival", {}).get("iata", ""),
-                    "Scheduled Time": dep_time,
-                    "Status": flight.get("status", ""),
-                })
+            dep_info = flight.get("departure", {})
+            arr_info = flight.get("arrival", {})
+            airline_info = flight.get("airline", {})
+            flight_info = flight.get("flight", {})
 
-        # Return the data
-        return today_departures
+            departures.append({
+                "Flight Number": flight_info.get("iata", ""),
+                "Airline": airline_info.get("name", ""),
+                "Destination": arr_info.get("iata", ""),
+                "Scheduled Departure Time": dep_info.get("scheduledTime", ""),
+                "Status": flight.get("status", "Unknown"),
+            })
 
+        return departures
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching departure details: {e}")
         return None
 
 # Streamlit Interface
-st.title("Download Today's Departures (SIN) as Excel")
+st.title("Download Entire Departure Dataset (SIN)")
 
-# Fetch departures when button is clicked
-if st.button("Fetch and Download Excel"):
-    departures = fetch_today_departures()
+if st.button("Fetch and Download Dataset"):
+    # Fetch data
+    departures = fetch_entire_departures()
     if departures:
-        # Display data in the app
-        st.write(f"Fetched {len(departures)} departures for today:")
-        st.dataframe(departures)
-
-        # Convert data to pandas DataFrame
+        # Convert to DataFrame
         df = pd.DataFrame(departures)
-        
-        # Provide download button directly using pandas Excel writer
+
+        # Display fetched data
+        st.write(f"Fetched {len(departures)} departures.")
+        st.dataframe(df)
+
+        # Convert DataFrame to Excel and allow download
         @st.cache_data
         def convert_df_to_excel(df):
-            # Write Excel data into a BytesIO buffer
             from io import BytesIO
             output = BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -71,10 +68,10 @@ if st.button("Fetch and Download Excel"):
         excel_data = convert_df_to_excel(df)
 
         st.download_button(
-            label="Download Excel",
+            label="Download Excel File",
             data=excel_data,
-            file_name="Today_Departures.xlsx",
+            file_name="Departures_SIN.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
     else:
-        st.warning("No departures found for today!")
+        st.warning("No departures found or unable to fetch the dataset.")
