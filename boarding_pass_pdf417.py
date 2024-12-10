@@ -44,13 +44,6 @@ def fetch_today_departures():
         st.error(f"Error fetching departure details: {e}")
         return None
 
-# Function to convert data to Excel
-def create_excel(data):
-    df = pd.DataFrame(data)  # Convert list of dictionaries to DataFrame
-    file_path = "Today_Departures.xlsx"
-    df.to_excel(file_path, index=False)  # Save to Excel file
-    return file_path
-
 # Streamlit Interface
 st.title("Download Today's Departures (SIN) as Excel")
 
@@ -62,14 +55,26 @@ if st.button("Fetch and Download Excel"):
         st.write(f"Fetched {len(departures)} departures for today:")
         st.dataframe(departures)
 
-        # Generate Excel file
-        excel_file = create_excel(departures)
+        # Convert data to pandas DataFrame
+        df = pd.DataFrame(departures)
+        
+        # Provide download button directly using pandas Excel writer
+        @st.cache_data
+        def convert_df_to_excel(df):
+            # Write Excel data into a BytesIO buffer
+            from io import BytesIO
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False, sheet_name="Departures")
+            return output.getvalue()
 
-        # Provide download link
-        with open(excel_file, "rb") as file:
-            st.download_button(
-                label="Download Excel",
-                data=file,
-                file_name="Today_Departures.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
+        excel_data = convert_df_to_excel(df)
+
+        st.download_button(
+            label="Download Excel",
+            data=excel_data,
+            file_name="Today_Departures.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    else:
+        st.warning("No departures found for today!")
