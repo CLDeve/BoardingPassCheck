@@ -85,6 +85,9 @@ if st.button("Scan"):
     if barcode_data:
         st.session_state.parsed_data, st.session_state.error_message = parse_iata_barcode(barcode_data)
         st.session_state.scanned_info = barcode_data
+
+        # Debugging: Validate parsed data
+        st.write("Parsed Data:", st.session_state.parsed_data)
     else:
         st.error("Please scan a barcode before clicking the 'Scan' button.")
 
@@ -93,16 +96,10 @@ if st.session_state.parsed_data:
     st.subheader("Parsed Boarding Pass Details:")
     st.json(st.session_state.parsed_data)
 
-    # Debugging: Display parsed parameters
-    st.write("Parsed Parameters:", {
-        "Flight Identifier (IATA)": st.session_state.parsed_data["Flight Identifier (IATA)"],
-        "Flight Date": st.session_state.parsed_data["Flight Date"],
-    })
-
     # Fetch flight schedule from API
     flight_schedule = get_flight_schedule(
-        st.session_state.parsed_data["Flight Identifier (IATA)"],
-        st.session_state.parsed_data["Flight Date"],
+        st.session_state.parsed_data.get("Flight Identifier (IATA)", ""),
+        st.session_state.parsed_data.get("Flight Date"),
     )
 
     if flight_schedule:
