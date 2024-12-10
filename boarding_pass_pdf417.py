@@ -17,14 +17,22 @@ def get_flight_details(departure_airport, flight_number, flight_date):
         "type": "departure",
     }
     try:
+        # API Request
         response = requests.get(FLIGHT_TRACKER_URL, params=params)
         response.raise_for_status()
         flights = response.json()
 
+        # Debugging: Log the API response
+        st.write("API Response:", flights)
+
         # Filter results based on flight number and date
         for flight in flights:
-            if (flight["flight"]["iataNumber"] == flight_number and
-                flight["departure"]["scheduledTime"].startswith(flight_date.strftime("%Y-%m-%d"))):
+            flight_num = flight["flight"]["iataNumber"]
+            scheduled_time = flight["departure"]["scheduledTime"]
+
+            # Match flight number and date
+            if (flight_num.endswith(flight_number) and
+                scheduled_time.startswith(flight_date.strftime("%Y-%m-%d"))):
                 return flight
         return None
     except requests.exceptions.RequestException as e:
