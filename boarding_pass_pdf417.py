@@ -1,77 +1,48 @@
-import streamlit as st
 import requests
 import pandas as pd
+from datetime import datetime
 
 # API Configuration
-AVIATION_EDGE_API_KEY = "56e9c3-1bef36"  # Replace with your valid API key
-ENTIRE_DATASET_URL = f"https://aviation-edge.com/v2/public/schedules?key={AVIATION_EDGE_API_KEY}"
+API_KEY = 'YOUR_API_KEY'  # Replace with your Aviation Edge API key
+IATA_CODE = 'SIN'  # Singapore Changi Airport
+TYPE = 'departure'  # Fetch departures
 
-# Function to fetch entire dataset for departures
-def fetch_entire_departures():
-    params = {
-        "depIata": "SIN",  # Fetch departures from Singapore (SIN)
-    }
-    try:
-        response = requests.get(ENTIRE_DATASET_URL, params=params)
-        response.raise_for_status()
-        flights = response.json()
+# Fetch today's date in YYYY-MM-DD format
+today = datetime.now().strftime('%Y-%m-%d')
 
-        # Check for valid data
-        if not isinstance(flights, list):
-            st.error("No departure data found or API error occurred.")
-            return None
+# API endpoint
+url = f'https://aviation-edge.com/v2/public/timetable'
 
-        # Process the data
-        departures = []
-        for flight in flights:
-            dep_info = flight.get("departure", {})
-            arr_info = flight.get("arrival", {})
-            airline_info = flight.get("airline", {})
-            flight_info = flight.get("flight", {})
+# Parameters
+params = {
+    'key': API_KEY,
+    'iataCode': IATA_CODE,
+    'type': TYPE
+}
 
-            departures.append({
-                "Flight Number": flight_info.get("iata", ""),
-                "Airline": airline_info.get("name", ""),
-                "Destination": arr_info.get("iata", ""),
-                "Scheduled Departure Time": dep_info.get("scheduledTime", ""),
-                "Status": flight.get("status", "Unknown"),
-            })
+# Make the request
+response = requests.get(url, params=params)
 
-        return departures
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching departure details: {e}")
-        return None
-
-# Streamlit Interface
-st.title("Download Entire Departure Dataset (SIN)")
-
-if st.button("Fetch and Download Dataset"):
-    # Fetch data
-    departures = fetch_entire_departures()
-    if departures:
-        # Convert to DataFrame
-        df = pd.DataFrame(departures)
-
-        # Display fetched data
-        st.write(f"Fetched {len(departures)} departures.")
-        st.dataframe(df)
-
-        # Convert DataFrame to Excel and allow download
-        @st.cache_data
-        def convert_df_to_excel(df):
-            from io import BytesIO
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False, sheet_name="Departures")
-            return output.getvalue()
-
-        excel_data = convert_df_to_excel(df)
-
-        st.download_button(
-            label="Download Excel File",
-            data=excel_data,
-            file_name="Departures_SIN.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-    else:
-        st.warning("No departures found or unable to fetch the dataset.")
+# Check if the request was successful
+if response.status_code == 200:
+    data = response.json()
+    # Filter flights departing today
+    today_departures = [
+        {
+            'Flight Number': flight['flight']['iataNumber'],
+            'Airline': flight['airline']['name'],
+            'Destination': flight['arrival']['iataCode'],
+            'Scheduled Time': flight['departure']['scheduledTime'],
+            'Status': flight['status']
+        }
+        for flight in data
+        if flight['departure']['scheduledTime'].startswith(today)
+    ]
+    # Create a DataFrame
+    df = pd.DataFrame(today_departures)
+    # Save to Excel
+    file_name = f'SIN_Departures_{today}.xlsx'
+    df.to_excel(file_name, index=False)
+    print(f'Data successfully saved to {file_name}')
+else:
+    print(f'Failed to fetch data: {response.status_code} - {response.text}')
