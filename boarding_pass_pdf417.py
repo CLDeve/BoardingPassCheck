@@ -36,7 +36,7 @@ def get_flight_schedule(departure_airport, flight_number, flight_date):
                 return flight
 
         # No matching flight found
-        st.error("No matching flight found in the API for the provided date.")
+        st.warning("No matching flight found in the API for the provided date.")
         return None
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching flight schedule: {e}")
@@ -112,6 +112,6 @@ if st.session_state.parsed_data:
         st.subheader("Flight Schedule from API:")
         st.json(flight_schedule)
     else:
-        st.error("No flight schedule found for this flight.")
+        st.warning("No flight schedule found for this flight.")
 elif st.session_state.error_message:
     st.error(st.session_state.error_message)
