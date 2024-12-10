@@ -21,18 +21,22 @@ def get_flight_schedule(departure_airport, flight_number, flight_date):
         response.raise_for_status()
         flights = response.json()
 
-        # Debugging: Log the API response
+        # Debugging: Log API response
         st.write("API Response:", flights)
 
-        if not isinstance(flights, list):
-            st.error("Unexpected API response format. Please check the API key or parameters.")
+        # Handle "No Record Found" error
+        if not isinstance(flights, list) or flights.get("error") == "No Record Found":
+            st.error("No record found in the API. Please verify the flight details.")
             return None
 
+        # Filter results based on flight date
         for flight in flights:
             dep_time = flight.get("departure", {}).get("scheduledTime", None)
             if dep_time and dep_time.startswith(flight_date.strftime("%Y-%m-%d")):
                 return flight
 
+        # No matching flight found
+        st.error("No matching flight found in the API for the provided date.")
         return None
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching flight schedule: {e}")
@@ -89,6 +93,13 @@ if st.button("Scan"):
 if st.session_state.parsed_data:
     st.subheader("Parsed Boarding Pass Details:")
     st.json(st.session_state.parsed_data)
+
+    # Debugging: Display parsed parameters
+    st.write("Parsed Parameters:", {
+        "Departure Airport": st.session_state.parsed_data["Departure Airport"],
+        "Flight Number": st.session_state.parsed_data["Flight Number"],
+        "Flight Date": st.session_state.parsed_data["Flight Date"],
+    })
 
     # Fetch flight schedule from API
     flight_schedule = get_flight_schedule(
