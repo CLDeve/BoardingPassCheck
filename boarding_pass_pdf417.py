@@ -102,6 +102,19 @@ def validate_flight(flight_details, barcode_date):
 
     return validation_messages
 
+# Custom CSS for full-screen red background
+def set_red_background():
+    st.markdown(
+        """
+        <style>
+        body {
+            background-color: red !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # Streamlit Interface
 st.title("Boarding Pass Validator with Flight Checks")
 
@@ -110,19 +123,6 @@ barcode_data = st.text_input(
     "Scan the barcode here:",
     placeholder="Place the cursor here and scan your boarding pass...",
 )
-
-# Custom CSS for full-screen red background
-def set_red_background():
-    st.markdown(
-        """
-        <style>
-        .main {
-            background-color: red !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
 # Fetch and Display Results
 if st.button("Scan and Validate"):
