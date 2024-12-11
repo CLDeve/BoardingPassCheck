@@ -119,13 +119,6 @@ if "barcode_data" not in st.session_state:
 def clear_barcode():
     st.session_state["barcode_data"] = ""
 
-# Scan boarding pass barcode
-barcode_data = st.text_input(
-    "Scan the barcode here:",
-    placeholder="Place the cursor here and scan your boarding pass...",
-    key="barcode_data"
-)
-
 # Inject custom CSS for conditional red background
 def apply_red_background():
     st.markdown(
@@ -139,12 +132,19 @@ def apply_red_background():
         unsafe_allow_html=True,
     )
 
-# Fetch and Display Results
+# Barcode input field with callback for clearing
+barcode_data = st.text_input(
+    "Scan the barcode here:",
+    placeholder="Place the cursor here and scan your boarding pass...",
+    key="barcode_data"
+)
+
+# Button to validate
 if st.button("Scan and Validate"):
     has_error = False
-    if barcode_data:
+    if st.session_state["barcode_data"]:
         # Parse the barcode
-        parsed_data, error = parse_iata_barcode(barcode_data)
+        parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
         if parsed_data:
             st.subheader("Parsed Boarding Pass Details")
             st.json(parsed_data)
