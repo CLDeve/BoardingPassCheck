@@ -60,7 +60,7 @@ def fetch_flight_departure(flight_iata, departure_airport="SIN"):
         return None
 
 # Function to validate flight details
-def validate_flight(flight_details):
+def validate_flight(flight_details, boarding_pass_details):
     validation_messages = []
 
     # Check if departure is from SIN
@@ -81,8 +81,15 @@ def validate_flight(flight_details):
         validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
         return validation_messages
 
-    # Check if flight date is today
+    # Check if flight date matches boarding pass date
     flight_date = flight_datetime.date()
+    boarding_pass_date = boarding_pass_details.get("Departure Date")
+    if flight_date != boarding_pass_date:
+        validation_messages.append(
+            f"Alert: Boarding pass date ({boarding_pass_date}) does not match flight date ({flight_date})!"
+        )
+
+    # Check if flight date is today
     current_date = datetime.now().date()
     if flight_date != current_date:
         validation_messages.append(
@@ -140,7 +147,7 @@ if st.button("Scan and Validate"):
                 st.json(flight_details)
 
                 # Validate flight details
-                validation_results = validate_flight(flight_details)
+                validation_results = validate_flight(flight_details, parsed_data)
                 if validation_results:
                     has_error = True
                     for alert in validation_results:
