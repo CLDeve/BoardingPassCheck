@@ -109,6 +109,7 @@ def set_red_background():
         <style>
         body {
             background-color: red !important;
+            color: white !important;
         }
         </style>
         """,
@@ -126,6 +127,8 @@ barcode_data = st.text_input(
 
 # Fetch and Display Results
 if st.button("Scan and Validate"):
+    alert_triggered = False  # Track if any alert is triggered
+
     if barcode_data:
         # Parse the barcode
         parsed_data, error = parse_iata_barcode(barcode_data)
@@ -142,21 +145,25 @@ if st.button("Scan and Validate"):
                 # Validate flight details with the parsed departure date
                 validation_results = validate_flight(flight_details, parsed_data["Departure Date"])
                 if validation_results:
-                    # Turn the screen red if invalid
-                    set_red_background()
+                    # Trigger red screen if invalid
+                    alert_triggered = True
                     for alert in validation_results:
                         st.error(alert)
                 else:
                     st.success("Flight details are valid!")
             else:
-                # Turn the screen red if no flight details found
-                set_red_background()
+                # Trigger red screen if no flight details found
+                alert_triggered = True
                 st.warning("No departure details found for this flight.")
         else:
-            # Turn the screen red if barcode parsing fails
-            set_red_background()
+            # Trigger red screen if barcode parsing fails
+            alert_triggered = True
             st.error(error)
     else:
-        # Turn the screen red if no barcode is scanned
-        set_red_background()
+        # Trigger red screen if no barcode is scanned
+        alert_triggered = True
         st.error("Please scan a barcode first.")
+
+    # Set red background if an alert is triggered
+    if alert_triggered:
+        set_red_background()
