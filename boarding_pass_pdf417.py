@@ -111,6 +111,19 @@ barcode_data = st.text_input(
     placeholder="Place the cursor here and scan your boarding pass...",
 )
 
+# Custom CSS for full-screen red background
+def set_red_background():
+    st.markdown(
+        """
+        <style>
+        .main {
+            background-color: red !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # Fetch and Display Results
 if st.button("Scan and Validate"):
     if barcode_data:
@@ -129,13 +142,21 @@ if st.button("Scan and Validate"):
                 # Validate flight details with the parsed departure date
                 validation_results = validate_flight(flight_details, parsed_data["Departure Date"])
                 if validation_results:
+                    # Turn the screen red if invalid
+                    set_red_background()
                     for alert in validation_results:
                         st.error(alert)
                 else:
                     st.success("Flight details are valid!")
             else:
+                # Turn the screen red if no flight details found
+                set_red_background()
                 st.warning("No departure details found for this flight.")
         else:
+            # Turn the screen red if barcode parsing fails
+            set_red_background()
             st.error(error)
     else:
+        # Turn the screen red if no barcode is scanned
+        set_red_background()
         st.error("Please scan a barcode first.")
