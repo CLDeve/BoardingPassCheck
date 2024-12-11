@@ -111,10 +111,19 @@ def validate_flight(flight_details, boarding_pass_details):
 # Streamlit Interface
 st.title("Boarding Pass Validator with Flight Checks")
 
+# Initialize session state for the barcode field
+if "barcode_data" not in st.session_state:
+    st.session_state["barcode_data"] = ""
+
+# Function to clear the barcode field
+def clear_barcode():
+    st.session_state["barcode_data"] = ""
+
 # Scan boarding pass barcode
 barcode_data = st.text_input(
     "Scan the barcode here:",
     placeholder="Place the cursor here and scan your boarding pass...",
+    key="barcode_data"
 )
 
 # Inject custom CSS for conditional red background
@@ -167,3 +176,6 @@ if st.button("Scan and Validate"):
     # Apply red background if there are errors
     if has_error:
         apply_red_background()
+
+    # Clear the barcode input field
+    clear_barcode()
