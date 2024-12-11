@@ -139,8 +139,8 @@ barcode_data = st.text_input(
     key="barcode_data"
 )
 
-# Button to validate and clear barcode after validation
-if st.button("Scan and Validate"):
+# Function to process validation and clear barcode
+def process_scan():
     has_error = False
     if st.session_state["barcode_data"]:
         # Parse the barcode
@@ -177,5 +177,5 @@ if st.button("Scan and Validate"):
     if has_error:
         apply_red_background()
 
-    # Clear the barcode input field after validation
-    clear_barcode()
+# Button to validate and clear barcode
+st.button("Scan and Validate", on_click=process_scan)
