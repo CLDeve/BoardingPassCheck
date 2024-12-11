@@ -34,136 +34,96 @@ def parse_iata_barcode(barcode):
 # Function to fetch flight departure details from API
 def fetch_flight_departure(flight_iata, departure_airport="SIN"):
     params = {
-        "key": API_KEY,
-        "iataCode": departure_airport,  # Hardcoded for Singapore departures
-        "type": "departure"
+        'key': API_KEY,
+        'iataCode': departure_airport,
+        'type': 'departure',
+        'flightIata': flight_iata
     }
     try:
         response = requests.get(BASE_URL, params=params)
-        response.raise_for_status()
-        flights = response.json()
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                # Assuming the response contains a list of flights
+                return data[0], None
+            else:
+                return None, "No flight data found."
+        else:
+            return None, f"API returned an error: {response.status_code}"
+    except Exception as e:
+        return None, f"Error fetching flight data: {e}"
 
-        # Filter for the specific flight
-        for flight in flights:
-            if flight.get("flight", {}).get("iataNumber") == flight_iata:
-                return {
-                    "Flight Number": flight.get("flight", {}).get("iataNumber", "N/A"),
-                    "Airline": flight.get("airline", {}).get("name", "N/A"),
-                    "Destination": flight.get("arrival", {}).get("iataCode", "N/A"),
-                    "Scheduled Departure Time": flight.get("departure", {}).get("scheduledTime", "N/A"),
-                    "Status": flight.get("status", "N/A"),
-                    "Departure Airport": departure_airport,
-                }
-        return None
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching departure details: {e}")
-        return None
-
-# Function to validate flight details
-def validate_flight(flight_details, barcode_date):
-    validation_messages = []
-
-    # Check if departure is from SIN
-    if flight_details.get("Departure Airport") != "SIN":
-        validation_messages.append("Alert: Departure is not from SIN!")
-
-    # Get and validate the scheduled departure time
-    scheduled_time = flight_details.get("Scheduled Departure Time", "")
-    if not scheduled_time:
-        validation_messages.append("Alert: Scheduled Departure Time is missing!")
-        return validation_messages
-
-    try:
-        # Remove fractional seconds if present
-        scheduled_time = scheduled_time.split(".")[0]  # Remove ".000" or similar
-        flight_datetime = datetime.strptime(scheduled_time.replace("T", " "), "%Y-%m-%d %H:%M:%S")
-    except ValueError as e:
-        validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
-        return validation_messages
-
-    # Compare the departure date from the barcode with the API date
-    api_date = flight_datetime.date()
-    if barcode_date != api_date:
-        validation_messages.append(
-            f"Alert: Mismatch between boarding pass date ({barcode_date}) and flight API date ({api_date})."
-        )
-
-    # Check if flight is within the next 24 hours
-    current_time = datetime.now()
-    time_difference = flight_datetime - current_time
-    if time_difference.total_seconds() < -3600:  # Allow flights within 1 hour in the past
-        validation_messages.append(
-            f"Alert: Flight has already taken off! (Flight Time: {flight_datetime}, Current Time: {current_time})"
-        )
-    elif time_difference.total_seconds() > 86400:  # More than 24 hours in the future
-        validation_messages.append(
-            f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime}, Current Time: {current_time})"
-        )
-
-    return validation_messages
-
-# Custom CSS for full-screen red background
-def set_red_background():
-    st.markdown(
-        """
-        <style>
-        body {
-            background-color: red !important;
-            color: white !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# Streamlit Interface
+# Streamlit app
 st.title("Boarding Pass Validator with Flight Checks")
 
-# Scan boarding pass barcode
-barcode_data = st.text_input(
-    "Scan the barcode here:",
-    placeholder="Place the cursor here and scan your boarding pass...",
-)
+# Input for barcode
+barcode = st.text_input("Scan the barcode here:")
 
-# Fetch and Display Results
 if st.button("Scan and Validate"):
-    alert_triggered = False  # Track if any alert is triggered
-
-    if barcode_data:
+    if barcode:
         # Parse the barcode
-        parsed_data, error = parse_iata_barcode(barcode_data)
-        if parsed_data:
+        parsed_data, parse_error = parse_iata_barcode(barcode)
+        if parse_error:
+            # Display parse error
+            st.error(parse_error)
+            # Apply red background
+            st.markdown(
+                """
+                <style>
+                .stApp {
+                    background-color: red;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            # Display parsed boarding pass details
             st.subheader("Parsed Boarding Pass Details")
             st.json(parsed_data)
 
-            # Search departure details
-            flight_details = fetch_flight_departure(parsed_data["Flight IATA"])
-            if flight_details:
-                st.subheader("Flight Departure Details")
-                st.json(flight_details)
-
-                # Validate flight details with the parsed departure date
-                validation_results = validate_flight(flight_details, parsed_data["Departure Date"])
-                if validation_results:
-                    # Trigger red screen if invalid
-                    alert_triggered = True
-                    for alert in validation_results:
-                        st.error(alert)
-                else:
-                    st.success("Flight details are valid!")
+            # Fetch flight departure details
+            flight_data, flight_error = fetch_flight_departure(parsed_data["Flight IATA"])
+            if flight_error:
+                # Display flight error
+                st.error(flight_error)
+                # Apply red background
+                st.markdown(
+                    """
+                    <style>
+                    .stApp {
+                        background-color: red;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
             else:
-                # Trigger red screen if no flight details found
-                alert_triggered = True
-                st.warning("No departure details found for this flight.")
-        else:
-            # Trigger red screen if barcode parsing fails
-            alert_triggered = True
-            st.error(error)
+                # Display flight details
+                st.subheader("Flight Departure Details")
+                st.json(flight_data)
+                # Reset background to white
+                st.markdown(
+                    """
+                    <style>
+                    .stApp {
+                        background-color: white;
+                    }
+                    </style>
+                    """,
+                    unsafe_allow_html=True
+                )
     else:
-        # Trigger red screen if no barcode is scanned
-        alert_triggered = True
-        st.error("Please scan a barcode first.")
-
-    # Set red background if an alert is triggered
-    if alert_triggered:
-        set_red_background()
+        # Handle empty barcode input
+        st.error("Please enter a valid barcode.")
+        # Apply red background
+        st.markdown(
+            """
+            <style>
+            .stApp {
+                background-color: red;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
