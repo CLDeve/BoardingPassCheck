@@ -64,19 +64,21 @@ if st.button("Scan and Validate"):
         # Parse the barcode
         parsed_data, parse_error = parse_iata_barcode(barcode)
         if parse_error:
-            # Display parse error
-            st.error(parse_error)
-            # Apply red background
+            # Display parse error with red background
             st.markdown(
                 """
                 <style>
-                .stApp {
+                .error {
                     background-color: red;
+                    padding: 10px;
+                    border-radius: 5px;
+                    color: white;
                 }
                 </style>
                 """,
                 unsafe_allow_html=True
             )
+            st.markdown(f"<div class='error'>{parse_error}</div>", unsafe_allow_html=True)
         else:
             # Display parsed boarding pass details
             st.subheader("Parsed Boarding Pass Details")
@@ -85,45 +87,38 @@ if st.button("Scan and Validate"):
             # Fetch flight departure details
             flight_data, flight_error = fetch_flight_departure(parsed_data["Flight IATA"])
             if flight_error:
-                # Display flight error
-                st.error(flight_error)
-                # Apply red background
+                # Display flight error with red background
                 st.markdown(
                     """
                     <style>
-                    .stApp {
+                    .error {
                         background-color: red;
+                        padding: 10px;
+                        border-radius: 5px;
+                        color: white;
                     }
                     </style>
                     """,
                     unsafe_allow_html=True
                 )
+                st.markdown(f"<div class='error'>{flight_error}</div>", unsafe_allow_html=True)
             else:
                 # Display flight details
                 st.subheader("Flight Departure Details")
                 st.json(flight_data)
-                # Reset background to white
-                st.markdown(
-                    """
-                    <style>
-                    .stApp {
-                        background-color: white;
-                    }
-                    </style>
-                    """,
-                    unsafe_allow_html=True
-                )
     else:
-        # Handle empty barcode input
-        st.error("Please enter a valid barcode.")
-        # Apply red background
+        # Handle empty barcode input with red background
         st.markdown(
             """
             <style>
-            .stApp {
+            .error {
                 background-color: red;
+                padding: 10px;
+                border-radius: 5px;
+                color: white;
             }
             </style>
             """,
             unsafe_allow_html=True
         )
+        st.markdown("<div class='error'>Please enter a valid barcode.</div>", unsafe_allow_html=True)
