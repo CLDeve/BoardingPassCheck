@@ -35,7 +35,7 @@ def parse_iata_barcode(barcode):
 def fetch_flight_departure(flight_iata, departure_airport="SIN"):
     params = {
         "key": API_KEY,
-        "iataCode": departure_airport,  # Hardcoded for Singapore departures
+        "iataCode": departure_airport,
         "type": "departure"
     }
     try:
@@ -75,7 +75,7 @@ def validate_flight(flight_details):
 
     try:
         # Remove fractional seconds if present
-        scheduled_time = scheduled_time.split(".")[0]  # Remove ".000" or similar
+        scheduled_time = scheduled_time.split(".")[0]
         flight_datetime = datetime.strptime(scheduled_time.replace("T", " "), "%Y-%m-%d %H:%M:%S")
     except ValueError as e:
         validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
@@ -92,7 +92,7 @@ def validate_flight(flight_details):
     # Check if flight is within the next 24 hours
     current_time = datetime.now()
     time_difference = flight_datetime - current_time
-    if not (0 <= time_difference.total_seconds() <= 86400):  # 24 hours in seconds
+    if not (0 <= time_difference.total_seconds() <= 86400):
         validation_messages.append(
             f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime}, Current Time: {current_time})"
         )
@@ -108,8 +108,22 @@ barcode_data = st.text_input(
     placeholder="Place the cursor here and scan your boarding pass...",
 )
 
+# Inject custom CSS for conditional red background
+def apply_red_background():
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: red;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # Fetch and Display Results
 if st.button("Scan and Validate"):
+    has_error = False
     if barcode_data:
         # Parse the barcode
         parsed_data, error = parse_iata_barcode(barcode_data)
@@ -126,13 +140,21 @@ if st.button("Scan and Validate"):
                 # Validate flight details
                 validation_results = validate_flight(flight_details)
                 if validation_results:
+                    has_error = True
                     for alert in validation_results:
                         st.error(alert)
                 else:
                     st.success("Flight details are valid!")
             else:
+                has_error = True
                 st.warning("No departure details found for this flight.")
         else:
+            has_error = True
             st.error(error)
     else:
+        has_error = True
         st.error("Please scan a barcode first.")
+
+    # Apply red background if there are errors
+    if has_error:
+        apply_red_background()
