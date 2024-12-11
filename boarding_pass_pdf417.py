@@ -115,32 +115,8 @@ st.title("Boarding Pass Validator with Flight Checks")
 if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
 
-# Callback function to clear the barcode field
-def clear_barcode():
-    st.session_state["barcode_data"] = ""
-
-# Inject custom CSS for conditional red background
-def apply_red_background():
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background-color: red;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# Barcode input field with session state management
-barcode_data = st.text_input(
-    "Scan the barcode here:",
-    placeholder="Place the cursor here and scan your boarding pass...",
-    key="barcode_data"
-)
-
-# Function to process validation and clear barcode
-def process_scan():
+# Function to process validation and reset barcode field
+def process_scan_and_reset():
     has_error = False
     if st.session_state["barcode_data"]:
         # Parse the barcode
@@ -173,9 +149,15 @@ def process_scan():
         has_error = True
         st.error("Please scan a barcode first.")
 
-    # Apply red background if there are errors
-    if has_error:
-        apply_red_background()
+    # Reset the barcode field
+    st.session_state["barcode_data"] = ""
 
-# Button to validate and clear barcode
-st.button("Scan and Validate", on_click=process_scan)
+# Barcode input field
+barcode_data = st.text_input(
+    "Scan the barcode here:",
+    placeholder="Place the cursor here and scan your boarding pass...",
+    key="barcode_data"
+)
+
+# Button to validate and reset the barcode field
+st.button("Scan and Validate", on_click=process_scan_and_reset)
