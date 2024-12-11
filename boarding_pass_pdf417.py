@@ -115,6 +115,9 @@ st.title("Boarding Pass Validator with Flight Checks")
 if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
 
+if "has_error" not in st.session_state:
+    st.session_state["has_error"] = False
+
 # Function to process validation and reset barcode field
 def process_scan_and_reset():
     has_error = False
@@ -141,7 +144,7 @@ def process_scan_and_reset():
                     st.success("Flight details are valid!")
             else:
                 has_error = True
-                st.warning("No departure details found for this flight.")
+                st.error("No departure details found for this flight.")
         else:
             has_error = True
             st.error(error)
@@ -149,8 +152,24 @@ def process_scan_and_reset():
         has_error = True
         st.error("Please scan a barcode first.")
 
+    # Set the global error flag
+    st.session_state["has_error"] = has_error
+
     # Reset the barcode field
     st.session_state["barcode_data"] = ""
+
+# Apply a red background if there's an error
+if st.session_state["has_error"]:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: red;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # Barcode input field
 barcode_data = st.text_input(
