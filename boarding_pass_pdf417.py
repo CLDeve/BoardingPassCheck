@@ -92,7 +92,9 @@ def validate_flight(flight_details):
     # Check if flight is within the next 24 hours
     current_time = datetime.now()
     time_difference = flight_datetime - current_time
-    if not (0 <= time_difference.total_seconds() <= 86400):
+    if time_difference.total_seconds() < 0:
+        validation_messages.append(f"Alert: The flight has already departed! (Flight Time: {flight_datetime})")
+    elif time_difference.total_seconds() > 86400:  # 24 hours in seconds
         validation_messages.append(
             f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime}, Current Time: {current_time})"
         )
