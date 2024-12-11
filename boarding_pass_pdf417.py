@@ -25,7 +25,7 @@ def parse_iata_barcode(barcode):
         return {
             "Passenger Name": passenger_name,
             "Flight IATA": flight_iata,
-            "Departure Date": flight_date.date(),
+            "Departure Date": flight_date.date(),  # Use date only
             "Seat Number": seat_number,
         }, None
     except Exception as e:
@@ -60,7 +60,7 @@ def fetch_flight_departure(flight_iata, departure_airport="SIN"):
         return None
 
 # Function to validate flight details
-def validate_flight(flight_details):
+def validate_flight(flight_details, barcode_date):
     validation_messages = []
 
     # Check if departure is from SIN
@@ -81,18 +81,21 @@ def validate_flight(flight_details):
         validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
         return validation_messages
 
-    # Check if flight date is today
-    flight_date = flight_datetime.date()
-    current_date = datetime.now().date()
-    if flight_date != current_date:
+    # Compare the departure date from the barcode with the API date
+    api_date = flight_datetime.date()
+    if barcode_date != api_date:
         validation_messages.append(
-            f"Alert: Flight date is not today! (Flight Date: {flight_date}, Today's Date: {current_date})"
+            f"Alert: Mismatch between boarding pass date ({barcode_date}) and flight API date ({api_date})."
         )
 
     # Check if flight is within the next 24 hours
     current_time = datetime.now()
     time_difference = flight_datetime - current_time
-    if not (0 <= time_difference.total_seconds() <= 86400):  # 24 hours in seconds
+    if time_difference.total_seconds() < -3600:  # Allow flights within 1 hour in the past
+        validation_messages.append(
+            f"Alert: Flight has already taken off! (Flight Time: {flight_datetime}, Current Time: {current_time})"
+        )
+    elif time_difference.total_seconds() > 86400:  # More than 24 hours in the future
         validation_messages.append(
             f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime}, Current Time: {current_time})"
         )
@@ -123,8 +126,8 @@ if st.button("Scan and Validate"):
                 st.subheader("Flight Departure Details")
                 st.json(flight_details)
 
-                # Validate flight details
-                validation_results = validate_flight(flight_details)
+                # Validate flight details with the parsed departure date
+                validation_results = validate_flight(flight_details, parsed_data["Departure Date"])
                 if validation_results:
                     for alert in validation_results:
                         st.error(alert)
