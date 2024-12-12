@@ -174,6 +174,3 @@ st.text_input(
     key="barcode_data",
     on_change=process_scan,
 )
-
-# Keep the cursor in the input field by re-rendering
-st.session_state["barcode_data"] = ""
