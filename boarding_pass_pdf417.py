@@ -139,6 +139,21 @@ def process_scan():
 # Streamlit Interface
 st.title("Boarding Pass Validator with Flight Checks")
 
+# Inject JavaScript for auto-focus on the text input
+st.markdown("""
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const barcodeInput = document.querySelector("input[type='text']");
+        if (barcodeInput) {
+            barcodeInput.focus();
+            barcodeInput.addEventListener('input', () => {
+                setTimeout(() => barcodeInput.value = "", 1000); // Reset input after 1 second
+            });
+        }
+    });
+</script>
+""", unsafe_allow_html=True)
+
 # Barcode input field with `on_change`
 st.text_input(
     "Scan the barcode here:",
