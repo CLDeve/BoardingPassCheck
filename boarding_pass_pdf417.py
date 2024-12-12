@@ -135,3 +135,5 @@ if st.button("Download All Flights on Selected Date"):
                 st.error(f"No flights found departing from {departure_airport} on {departure_date}.")
         else:
             st.error("No departure data available for the specified airport.")
+
+it should not save data
