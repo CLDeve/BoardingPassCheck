@@ -1,13 +1,9 @@
 import streamlit as st
 import requests
 from datetime import datetime, timedelta
-import pytz  # For time zone handling
-
-# Define local time zone (Singapore Time for SIN)
-LOCAL_TIMEZONE = pytz.timezone("Asia/Singapore")
 
 # API Configuration
-API_KEY = '56e9c3-1bef36'  # Replace with your actual API key
+API_KEY = '56e9c3-1bef36'  # Your Aviation Edge API key
 BASE_URL = 'https://aviation-edge.com/v2/public/timetable'
 
 # Helper function to parse IATA boarding pass barcode
@@ -47,24 +43,14 @@ def fetch_flight_departure(flight_iata, departure_airport="SIN"):
 
         for flight in flights:
             if flight.get("flight", {}).get("iataNumber") == flight_iata:
-                # Parse scheduledTime from API (assumed to be UTC)
-                scheduled_time_utc = flight.get("departure", {}).get("scheduledTime", "")
-                if scheduled_time_utc:
-                    scheduled_datetime_utc = datetime.strptime(
-                        scheduled_time_utc.split(".")[0], "%Y-%m-%dT%H:%M:%S"
-                    ).replace(tzinfo=pytz.utc)  # Treat as UTC
-                    # Convert to local time for validation
-                    scheduled_datetime_local = scheduled_datetime_utc.astimezone(LOCAL_TIMEZONE)
-                    formatted_scheduled_time = scheduled_datetime_local.strftime("%d/%b/%Y %H:%M")
-                else:
-                    formatted_scheduled_time = "N/A"
-
                 return {
                     "Flight Number": flight.get("flight", {}).get("iataNumber", "N/A"),
                     "Airline": flight.get("airline", {}).get("name", "N/A"),
                     "Destination": flight.get("arrival", {}).get("iataCode", "N/A"),
-                    "Scheduled Departure Time": formatted_scheduled_time,
-                    "Scheduled Time for Validation": scheduled_datetime_local,  # Keep for comparison
+                    "Scheduled Departure Time": datetime.strptime(
+                        flight.get("departure", {}).get("scheduledTime", "").split(".")[0],
+                        "%Y-%m-%dT%H:%M:%S"
+                    ).strftime("%d/%b/%Y %H:%M") if flight.get("departure", {}).get("scheduledTime") else "N/A",  # Format date and time here
                     "Status": flight.get("status", "N/A"),
                     "Departure Airport": departure_airport,
                 }
@@ -81,63 +67,153 @@ def validate_flight(flight_details, boarding_pass_details):
     if flight_details.get("Departure Airport") != "SIN":
         validation_messages.append("Alert: Departure is not from SIN!")
 
-    # Validate the scheduled departure time
+    # Get and validate the scheduled departure time
     scheduled_time = flight_details.get("Scheduled Departure Time", "")
-    scheduled_datetime_local = flight_details.get("Scheduled Time for Validation", None)
-    if not scheduled_time or scheduled_time == "N/A" or scheduled_datetime_local is None:
+    if not scheduled_time or scheduled_time == "N/A":
         validation_messages.append("Alert: Scheduled Departure Time is missing!")
         return validation_messages
 
-    # Compare boarding pass date with API date
-    flight_date = scheduled_datetime_local.date()
+    try:
+        flight_datetime = datetime.strptime(scheduled_time, "%d/%b/%Y %H:%M")
+    except ValueError as e:
+        validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
+        return validation_messages
+
+    # Check if flight date matches boarding pass date
+    flight_date = flight_datetime.date()
     boarding_pass_date = datetime.strptime(boarding_pass_details.get("Departure Date"), "%d/%b/%Y").date()
     if flight_date != boarding_pass_date:
         validation_messages.append(
             f"Alert: Boarding pass date ({boarding_pass_details['Departure Date']}) "
-            f"does not match flight date ({scheduled_datetime_local.strftime('%d/%b/%Y')})!"
+            f"does not match flight date ({flight_datetime.strftime('%d/%b/%Y')})!"
         )
 
-    # Compare with local time for 24-hour check
-    current_time = datetime.now(LOCAL_TIMEZONE)
-    time_difference = scheduled_datetime_local - current_time
-    if time_difference.total_seconds() < 0:
+    # Check if flight date is today
+    current_date = datetime.now().date()
+    if flight_date != current_date:
         validation_messages.append(
-            f"Alert: The flight has already departed! (Flight Time: {scheduled_datetime_local.strftime('%d/%b/%Y %H:%M')})"
+            f"Alert: Flight date is not today! (Flight Date: {flight_datetime.strftime('%d/%b/%Y')}, "
+            f"Today's Date: {current_date.strftime('%d/%b/%Y')})"
         )
+
+    # Check if flight is within the next 24 hours
+    current_time = datetime.now()
+    time_difference = flight_datetime - current_time
+    if time_difference.total_seconds() < 0:
+        validation_messages.append(f"Alert: The flight has already departed! (Flight Time: {flight_datetime.strftime('%d/%b/%Y %H:%M')})")
     elif time_difference.total_seconds() > 86400:  # 24 hours in seconds
         validation_messages.append(
-            f"Alert: Flight is more than 24 hours away! (Flight Time: {scheduled_datetime_local.strftime('%d/%b/%Y %H:%M')}, "
+            f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime.strftime('%d/%b/%Y %H:%M')}, "
             f"Current Time: {current_time.strftime('%d/%b/%Y %H:%M')})"
         )
 
     return validation_messages
 
-# Streamlit Interface
+# Initialize session state
 if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
+if "has_error" not in st.session_state:
+    st.session_state["has_error"] = False
+if "is_valid" not in st.session_state:
+    st.session_state["is_valid"] = False
 
+# Function to process the scanned barcode
 def process_scan():
+    has_error = False
+    is_valid = False
     if st.session_state["barcode_data"]:
+        # Parse the barcode
         parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
         if parsed_data:
+            # Fetch flight departure details
             flight_details = fetch_flight_departure(parsed_data["Flight IATA"])
             if flight_details:
+                st.subheader("Flight Departure Details")
                 st.json(flight_details)
+
+                # Validate flight details
                 validation_results = validate_flight(flight_details, parsed_data)
-                for message in validation_results:
-                    if "Alert" in message:
-                        st.error(message)
-                    else:
-                        st.success(message)
+                if validation_results:
+                    has_error = True
+                    for alert in validation_results:
+                        st.markdown(f"<div class='alert'>{alert}</div>", unsafe_allow_html=True)
+                else:
+                    is_valid = True
+                    st.markdown("<div class='success'>Flight details are valid!</div>", unsafe_allow_html=True)
             else:
-                st.error("No departure details found.")
+                has_error = True
+                st.markdown("<div class='alert'>No departure details found for this flight.</div>", unsafe_allow_html=True)
         else:
-            st.error(error)
+            has_error = True
+            st.markdown(f"<div class='alert'>{error}</div>", unsafe_allow_html=True)
+
+        # Reset the barcode data
         st.session_state["barcode_data"] = ""
 
+    # Set the state flags
+    st.session_state["has_error"] = has_error
+    st.session_state["is_valid"] = is_valid
+
+# Apply dynamic background colors
+if st.session_state["has_error"]:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #ffcccc;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+elif st.session_state["is_valid"]:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #ccffcc;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# Add CSS styles for larger messages
+st.markdown(
+    """
+    <style>
+    .alert {
+        color: red;
+        font-size: 24px;
+        font-weight: bold;
+    }
+    .success {
+        color: green;
+        font-size: 24px;
+        font-weight: bold;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Text input for barcode scanning with automatic processing
 st.text_input(
     "Scan the barcode here:",
     placeholder="Place the cursor here and scan your boarding pass...",
     key="barcode_data",
     on_change=process_scan,
+)
+
+# Inject JavaScript to keep the cursor in the input field
+st.markdown(
+    """
+    <script>
+    const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
+    if (input) {
+        input.focus();
+    }
+    </script>
+    """,
+    unsafe_allow_html=True,
 )
