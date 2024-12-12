@@ -1,137 +1,182 @@
 import streamlit as st
-import pandas as pd
-from datetime import datetime
 import requests
+from datetime import datetime, timedelta
 
 # API Configuration
-API_KEY = '56e9c3-1bef36'  # Replace with your Aviation Edge API key
+API_KEY = '56e9c3-1bef36'  # Your Aviation Edge API key
 BASE_URL = 'https://aviation-edge.com/v2/public/timetable'
 
-# Function to fetch departure flights
-def fetch_departures(departure_airport="SIN"):
-    """
-    Fetch all departure flights from the API for a given airport.
+# Helper function to parse IATA boarding pass barcode
+def parse_iata_barcode(barcode):
+    try:
+        passenger_name = barcode[2:22].strip()  # Extract passenger name
+        airline_code = barcode[36:39].strip()  # Extract airline code
+        flight_number = barcode[39:44].strip()  # Extract flight number
+        julian_date = int(barcode[44:47])  # Julian date for flight
+        seat_number = barcode[48:51].strip()  # Extract seat number
 
-    Args:
-        departure_airport (str): IATA code for the departure airport.
+        # Convert Julian date to proper date
+        year = datetime.now().year
+        flight_date = datetime(year, 1, 1) + timedelta(days=julian_date - 1)
 
-    Returns:
-        list: List of flights returned by the API.
-    """
+        # Combine airline code and flight number
+        flight_iata = f"{airline_code}{flight_number.lstrip('0')}"
+
+        return {
+            "Passenger Name": passenger_name,
+            "Flight IATA": flight_iata,
+            "Departure Date": flight_date.date(),
+            "Seat Number": seat_number,
+        }, None
+    except Exception as e:
+        return None, f"Error parsing barcode: {e}"
+
+# Function to fetch flight departure details from API
+def fetch_flight_departure(flight_iata, departure_airport="SIN"):
     params = {
         "key": API_KEY,
         "iataCode": departure_airport,
-        "type": "departure"  # Fetch departure flights
+        "type": "departure"
     }
     try:
         response = requests.get(BASE_URL, params=params)
         response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching flight data: {e}")
-        return []
+        flights = response.json()
 
-# Function to filter flights by date
-def filter_flights_by_date(flights, target_date):
-    """
-    Filter flights by a specific date.
-
-    Args:
-        flights (list): List of flight data.
-        target_date (str): Target date in YYYY-MM-DD format.
-
-    Returns:
-        list: List of flights matching the target date.
-    """
-    target_date = datetime.strptime(target_date, "%Y-%m-%d").date()
-    filtered_flights = []
-    for flight in flights:
-        scheduled_time = flight.get("departure", {}).get("scheduledTime", None)
-        if scheduled_time:
-            flight_date = datetime.strptime(scheduled_time.split("T")[0], "%Y-%m-%d").date()
-            if flight_date == target_date:
-                filtered_flights.append({
+        # Filter for the specific flight
+        for flight in flights:
+            if flight.get("flight", {}).get("iataNumber") == flight_iata:
+                return {
                     "Flight Number": flight.get("flight", {}).get("iataNumber", "N/A"),
                     "Airline": flight.get("airline", {}).get("name", "N/A"),
                     "Destination": flight.get("arrival", {}).get("iataCode", "N/A"),
                     "Scheduled Departure Time": flight.get("departure", {}).get("scheduledTime", "N/A"),
                     "Status": flight.get("status", "N/A"),
-                })
-    return filtered_flights
+                    "Departure Airport": departure_airport,
+                }
+        return None
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching departure details: {e}")
+        return None
+
+# Function to validate flight details
+def validate_flight(flight_details, boarding_pass_details):
+    validation_messages = []
+
+    # Check if departure is from SIN
+    if flight_details.get("Departure Airport") != "SIN":
+        validation_messages.append("Alert: Departure is not from SIN!")
+
+    # Get and validate the scheduled departure time
+    scheduled_time = flight_details.get("Scheduled Departure Time", "")
+    if not scheduled_time:
+        validation_messages.append("Alert: Scheduled Departure Time is missing!")
+        return validation_messages
+
+    try:
+        # Remove fractional seconds if present
+        scheduled_time = scheduled_time.split(".")[0]
+        flight_datetime = datetime.strptime(scheduled_time.replace("T", " "), "%Y-%m-%d %H:%M:%S")
+    except ValueError as e:
+        validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
+        return validation_messages
+
+    # Check if flight date matches boarding pass date
+    flight_date = flight_datetime.date()
+    boarding_pass_date = boarding_pass_details.get("Departure Date")
+    if flight_date != boarding_pass_date:
+        validation_messages.append(
+            f"Alert: Boarding pass date ({boarding_pass_date}) does not match flight date ({flight_date})!"
+        )
+
+    # Check if flight date is today
+    current_date = datetime.now().date()
+    if flight_date != current_date:
+        validation_messages.append(
+            f"Alert: Flight date is not today! (Flight Date: {flight_date}, Today's Date: {current_date})"
+        )
+
+    # Check if flight is within the next 24 hours
+    current_time = datetime.now()
+    time_difference = flight_datetime - current_time
+    if time_difference.total_seconds() < 0:
+        validation_messages.append(f"Alert: The flight has already departed! (Flight Time: {flight_datetime})")
+    elif time_difference.total_seconds() > 86400:  # 24 hours in seconds
+        validation_messages.append(
+            f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime}, Current Time: {current_time})"
+        )
+
+    return validation_messages
 
 # Streamlit Interface
-st.title("Flight Departure Status Checker")
+st.title("Boarding Pass Validator with Flight Checks")
 
-# Inputs
-flight_number = st.text_input("Enter the flight number (e.g., EK353):")
-departure_airport = st.text_input("Enter the departure airport IATA code (e.g., SIN):", value="SIN")
-departure_date = st.date_input("Select the departure date:", min_value=datetime.now().date())
+# Initialize session state for the barcode field
+if "barcode_data" not in st.session_state:
+    st.session_state["barcode_data"] = ""
 
-# Check and filter flights
-if st.button("Check Flight Status"):
-    if flight_number and departure_airport and departure_date:
-        st.write(f"Checking flight {flight_number} departing from {departure_airport} on {departure_date}...")
-        
-        # Fetch all departures
-        flights = fetch_departures(departure_airport)
+if "has_error" not in st.session_state:
+    st.session_state["has_error"] = False
 
-        if flights:
-            # Filter flights by date
-            filtered_flights = filter_flights_by_date(flights, departure_date.strftime("%Y-%m-%d"))
-            
-            # Check if the specific flight exists
-            flight_details = next((f for f in filtered_flights if f["Flight Number"] == flight_number), None)
-            
+# Function to process validation and reset barcode field
+def process_scan_and_reset():
+    has_error = False
+    if st.session_state["barcode_data"]:
+        # Parse the barcode
+        parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
+        if parsed_data:
+            st.subheader("Parsed Boarding Pass Details")
+            st.json(parsed_data)
+
+            # Search departure details
+            flight_details = fetch_flight_departure(parsed_data["Flight IATA"])
             if flight_details:
-                st.write("Flight Details:")
+                st.subheader("Flight Departure Details")
                 st.json(flight_details)
 
-                # Determine the flight's status
-                status = flight_details["Status"].lower()
-                if status == "active":
-                    st.success("The flight has already departed.")
-                elif status == "scheduled":
-                    st.warning("The flight is scheduled but has not departed yet.")
-                elif status == "cancelled":
-                    st.error("The flight has been cancelled.")
+                # Validate flight details
+                validation_results = validate_flight(flight_details, parsed_data)
+                if validation_results:
+                    has_error = True
+                    for alert in validation_results:
+                        st.error(alert)
                 else:
-                    st.info("The flight status is unknown.")
+                    st.success("Flight details are valid!")
             else:
-                st.error(f"No flight with number {flight_number} found for {departure_date}.")
+                has_error = True
+                st.error("No departure details found for this flight.")
         else:
-            st.error("No departure data available for the specified airport.")
+            has_error = True
+            st.error(error)
     else:
-        st.error("Please provide the flight number, departure airport, and date.")
+        has_error = True
+        st.error("Please scan a barcode first.")
 
-# Option to download all filtered flights
-if st.button("Download All Flights on Selected Date"):
-    if departure_airport and departure_date:
-        st.write(f"Fetching all flights departing from {departure_airport} on {departure_date}...")
-        
-        # Fetch all departures
-        flights = fetch_departures(departure_airport)
+    # Set the global error flag
+    st.session_state["has_error"] = has_error
 
-        if flights:
-            # Filter flights by date
-            filtered_flights = filter_flights_by_date(flights, departure_date.strftime("%Y-%m-%d"))
-            
-            if filtered_flights:
-                # Convert to DataFrame
-                flight_df = pd.DataFrame(filtered_flights)
+    # Reset the barcode field
+    st.session_state["barcode_data"] = ""
 
-                # Convert DataFrame to Excel
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                    flight_df.to_excel(writer, index=False, sheet_name='Flights')
+# Apply a red background if there's an error
+if st.session_state["has_error"]:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: red;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-                # Provide download button
-                st.download_button(
-                    label="Download Flights as Excel",
-                    data=output.getvalue(),
-                    file_name=f"{departure_airport}_flights_{departure_date}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-            else:
-                st.error(f"No flights found departing from {departure_airport} on {departure_date}.")
-        else:
-            st.error("No departure data available for the specified airport.")
+# Barcode input field
+barcode_data = st.text_input(
+    "Scan the barcode here:",
+    placeholder="Place the cursor here and scan your boarding pass...",
+    key="barcode_data"
+)
+
+# Button to validate and reset the barcode field
+st.button("Scan and Validate", on_click=process_scan_and_reset)
