@@ -60,6 +60,8 @@ def fetch_flight_departure(flight_iata):
 # Function to process scan
 def process_scan():
     barcode_data = st.session_state["barcode_data"]
+    has_error = False
+
     if barcode_data:
         # Parse the barcode
         parsed_data, error = parse_iata_barcode(barcode_data)
@@ -76,15 +78,44 @@ def process_scan():
                 # Additional flight validation can go here
                 st.success("Flight details are valid!")
             else:
+                has_error = True
                 st.error("No departure details found for this flight.")
         else:
+            has_error = True
             st.error(error)
 
         # Clear the barcode field after processing
         st.session_state["barcode_data"] = ""
 
+    else:
+        has_error = True
+        st.error("Please scan a barcode first.")
+
+    # Set the background to red if there's an error
+    if has_error:
+        st.session_state["has_error"] = True
+    else:
+        st.session_state["has_error"] = False
+
+# Initialize session state
+if "has_error" not in st.session_state:
+    st.session_state["has_error"] = False
+
 # Streamlit Interface
 st.title("Boarding Pass Validator")
+
+# Apply red background if there's an error
+if st.session_state["has_error"]:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: red;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # Inject JavaScript for auto-focus on the input field
 st.markdown("""
