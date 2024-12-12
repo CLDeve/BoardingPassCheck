@@ -109,9 +109,6 @@ def validate_flight(flight_details, boarding_pass_details):
 
     return validation_messages
 
-# Streamlit Interface
-st.title("Boarding Pass Validator with Flight Checks")
-
 # Initialize session state
 if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
