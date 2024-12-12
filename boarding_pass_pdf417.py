@@ -7,10 +7,6 @@ import requests
 API_KEY = '56e9c3-1bef36'  # Replace with your Aviation Edge API key
 BASE_URL = 'https://aviation-edge.com/v2/public/timetable'
 
-# Initialize session state for barcode input
-if "barcode_input" not in st.session_state:
-    st.session_state["barcode_input"] = ""
-
 # Function to fetch departure flights
 def fetch_departures(departure_airport="SIN"):
     """
@@ -64,31 +60,9 @@ def filter_flights_by_date(flights, target_date):
     return filtered_flights
 
 # Streamlit Interface
-st.title("Boarding Pass Validator with Flight Checks")
+st.title("Flight Departure Status Checker")
 
-# CSS to disable auto-fill
-st.markdown("""
-<style>
-input[type="text"] {
-    autocomplete: off;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Barcode input
-barcode = st.text_input("Scan the barcode here:", 
-                        placeholder="Place the cursor here and scan your boarding pass...", 
-                        key="barcode_input")
-
-# Scan and validate button
-if st.button("Scan and Validate"):
-    if barcode:
-        st.write(f"Validating barcode: {barcode}")
-        st.session_state["barcode_input"] = ""  # Reset the barcode field
-    else:
-        st.error("Please scan a barcode.")
-
-# Flight details input
+# Inputs
 flight_number = st.text_input("Enter the flight number (e.g., EK353):")
 departure_airport = st.text_input("Enter the departure airport IATA code (e.g., SIN):", value="SIN")
 departure_date = st.date_input("Select the departure date:", min_value=datetime.now().date())
@@ -128,3 +102,36 @@ if st.button("Check Flight Status"):
             st.error("No departure data available for the specified airport.")
     else:
         st.error("Please provide the flight number, departure airport, and date.")
+
+# Option to download all filtered flights
+if st.button("Download All Flights on Selected Date"):
+    if departure_airport and departure_date:
+        st.write(f"Fetching all flights departing from {departure_airport} on {departure_date}...")
+        
+        # Fetch all departures
+        flights = fetch_departures(departure_airport)
+
+        if flights:
+            # Filter flights by date
+            filtered_flights = filter_flights_by_date(flights, departure_date.strftime("%Y-%m-%d"))
+            
+            if filtered_flights:
+                # Convert to DataFrame
+                flight_df = pd.DataFrame(filtered_flights)
+
+                # Convert DataFrame to Excel
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                    flight_df.to_excel(writer, index=False, sheet_name='Flights')
+
+                # Provide download button
+                st.download_button(
+                    label="Download Flights as Excel",
+                    data=output.getvalue(),
+                    file_name=f"{departure_airport}_flights_{departure_date}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+            else:
+                st.error(f"No flights found departing from {departure_airport} on {departure_date}.")
+        else:
+            st.error("No departure data available for the specified airport.")
