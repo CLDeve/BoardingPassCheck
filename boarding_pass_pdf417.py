@@ -53,7 +53,7 @@ def fetch_flight_departure(flight_iata, departure_airport="SIN"):
                     scheduled_datetime_utc = datetime.strptime(
                         scheduled_time_utc.split(".")[0], "%Y-%m-%dT%H:%M:%S"
                     ).replace(tzinfo=pytz.utc)  # Treat as UTC
-                    # Convert to local time
+                    # Convert to local time for validation
                     scheduled_datetime_local = scheduled_datetime_utc.astimezone(LOCAL_TIMEZONE)
                     formatted_scheduled_time = scheduled_datetime_local.strftime("%d/%b/%Y %H:%M")
                 else:
@@ -64,6 +64,7 @@ def fetch_flight_departure(flight_iata, departure_airport="SIN"):
                     "Airline": flight.get("airline", {}).get("name", "N/A"),
                     "Destination": flight.get("arrival", {}).get("iataCode", "N/A"),
                     "Scheduled Departure Time": formatted_scheduled_time,
+                    "Scheduled Time for Validation": scheduled_datetime_local,  # Keep for comparison
                     "Status": flight.get("status", "N/A"),
                     "Departure Airport": departure_airport,
                 }
@@ -80,36 +81,32 @@ def validate_flight(flight_details, boarding_pass_details):
     if flight_details.get("Departure Airport") != "SIN":
         validation_messages.append("Alert: Departure is not from SIN!")
 
-    # Get and validate the scheduled departure time
+    # Validate the scheduled departure time
     scheduled_time = flight_details.get("Scheduled Departure Time", "")
-    if not scheduled_time or scheduled_time == "N/A":
+    scheduled_datetime_local = flight_details.get("Scheduled Time for Validation", None)
+    if not scheduled_time or scheduled_time == "N/A" or scheduled_datetime_local is None:
         validation_messages.append("Alert: Scheduled Departure Time is missing!")
         return validation_messages
 
-    try:
-        # Parse the local scheduled time
-        flight_datetime_local = datetime.strptime(scheduled_time, "%d/%b/%Y %H:%M").replace(tzinfo=LOCAL_TIMEZONE)
-    except ValueError as e:
-        validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
-        return validation_messages
-
-    # Check if flight date matches boarding pass date
-    flight_date = flight_datetime_local.date()
+    # Compare boarding pass date with API date
+    flight_date = scheduled_datetime_local.date()
     boarding_pass_date = datetime.strptime(boarding_pass_details.get("Departure Date"), "%d/%b/%Y").date()
     if flight_date != boarding_pass_date:
         validation_messages.append(
             f"Alert: Boarding pass date ({boarding_pass_details['Departure Date']}) "
-            f"does not match flight date ({flight_datetime_local.strftime('%d/%b/%Y')})!"
+            f"does not match flight date ({scheduled_datetime_local.strftime('%d/%b/%Y')})!"
         )
 
-    # Check if flight date and time are within 24 hours
+    # Compare with local time for 24-hour check
     current_time = datetime.now(LOCAL_TIMEZONE)
-    time_difference = flight_datetime_local - current_time
+    time_difference = scheduled_datetime_local - current_time
     if time_difference.total_seconds() < 0:
-        validation_messages.append(f"Alert: The flight has already departed! (Flight Time: {flight_datetime_local.strftime('%d/%b/%Y %H:%M')})")
+        validation_messages.append(
+            f"Alert: The flight has already departed! (Flight Time: {scheduled_datetime_local.strftime('%d/%b/%Y %H:%M')})"
+        )
     elif time_difference.total_seconds() > 86400:  # 24 hours in seconds
         validation_messages.append(
-            f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime_local.strftime('%d/%b/%Y %H:%M')}, "
+            f"Alert: Flight is more than 24 hours away! (Flight Time: {scheduled_datetime_local.strftime('%d/%b/%Y %H:%M')}, "
             f"Current Time: {current_time.strftime('%d/%b/%Y %H:%M')})"
         )
 
@@ -120,7 +117,6 @@ if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
 
 def process_scan():
-    has_error = False
     if st.session_state["barcode_data"]:
         parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
         if parsed_data:
@@ -129,7 +125,10 @@ def process_scan():
                 st.json(flight_details)
                 validation_results = validate_flight(flight_details, parsed_data)
                 for message in validation_results:
-                    st.error(message) if "Alert" in message else st.success(message)
+                    if "Alert" in message:
+                        st.error(message)
+                    else:
+                        st.success(message)
             else:
                 st.error("No departure details found.")
         else:
