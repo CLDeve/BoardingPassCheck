@@ -128,9 +128,6 @@ def process_scan():
         # Parse the barcode
         parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
         if parsed_data:
-            st.subheader("Parsed Boarding Pass Details")
-            st.json(parsed_data)
-
             # Fetch flight departure details
             flight_details = fetch_flight_departure(parsed_data["Flight IATA"])
             if flight_details:
