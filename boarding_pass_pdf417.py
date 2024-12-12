@@ -140,7 +140,7 @@ def process_scan():
 if st.session_state["scan_time"]:
     elapsed_time = (datetime.now() - st.session_state["scan_time"]).total_seconds()
     if elapsed_time > 5:
-        st.session_state["barcode_data"] = ""
+        st.session_state["barcode_data"] = ""  # Clear the input field
         st.session_state["scan_time"] = None
         st.experimental_rerun()
 
@@ -151,23 +151,3 @@ st.text_input(
     key="barcode_data",
     on_change=process_scan,
 )
-
-# Dynamic background colors for error and success states
-if st.session_state.get("has_error", False):
-    st.markdown(
-        """
-        <style>
-        .stApp { background-color: #ffcccc; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-elif st.session_state.get("is_valid", False):
-    st.markdown(
-        """
-        <style>
-        .stApp { background-color: #ccffcc; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
