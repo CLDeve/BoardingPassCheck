@@ -142,6 +142,9 @@ def process_scan():
         else:
             st.error(error)
 
+        # Clear the barcode data for the next scan
+        st.session_state["barcode_data"] = ""
+
 # Text input for barcode scanning with automatic processing
 st.text_input(
     "Scan the barcode here:",
