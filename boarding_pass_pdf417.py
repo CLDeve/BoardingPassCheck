@@ -112,8 +112,8 @@ def validate_flight(flight_details, boarding_pass_details):
 # Initialize session state
 if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
-if "last_scan_time" not in st.session_state:
-    st.session_state["last_scan_time"] = None
+if "scan_time" not in st.session_state:
+    st.session_state["scan_time"] = None
 
 # Function to process the scanned barcode
 def process_scan():
@@ -132,14 +132,16 @@ def process_scan():
                 st.error("No departure details found.")
         else:
             st.error(error)
-        st.session_state["last_scan_time"] = datetime.now()  # Record the scan time
 
-# Check if 5 seconds have passed since the last scan
-if st.session_state["last_scan_time"]:
-    elapsed_time = (datetime.now() - st.session_state["last_scan_time"]).total_seconds()
+        # Record the scan time
+        st.session_state["scan_time"] = datetime.now()
+
+# Automatically clear screen after 5 seconds
+if st.session_state["scan_time"]:
+    elapsed_time = (datetime.now() - st.session_state["scan_time"]).total_seconds()
     if elapsed_time > 5:
-        st.session_state["barcode_data"] = ""  # Clear the input field
-        st.session_state["last_scan_time"] = None  # Reset the scan time
+        st.session_state["barcode_data"] = ""
+        st.session_state["scan_time"] = None
         st.experimental_rerun()
 
 # Text input for barcode scanning with automatic processing
@@ -149,3 +151,23 @@ st.text_input(
     key="barcode_data",
     on_change=process_scan,
 )
+
+# Dynamic background colors for error and success states
+if st.session_state.get("has_error", False):
+    st.markdown(
+        """
+        <style>
+        .stApp { background-color: #ffcccc; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+elif st.session_state.get("is_valid", False):
+    st.markdown(
+        """
+        <style>
+        .stApp { background-color: #ccffcc; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
