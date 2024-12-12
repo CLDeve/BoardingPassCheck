@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 from datetime import datetime, timedelta
-import time  # For adding delay
 
 # API Configuration
 API_KEY = '56e9c3-1bef36'  # Your Aviation Edge API key
@@ -110,43 +109,38 @@ def validate_flight(flight_details, boarding_pass_details):
 
     return validation_messages
 
+# Initialize session state
+if "barcode_data" not in st.session_state:
+    st.session_state["barcode_data"] = ""
+if "last_scan_time" not in st.session_state:
+    st.session_state["last_scan_time"] = None
+
 # Function to process the scanned barcode
 def process_scan():
-    has_error = False
-    is_valid = False
     if st.session_state["barcode_data"]:
-        # Parse the barcode
         parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
         if parsed_data:
-            # Fetch flight departure details
             flight_details = fetch_flight_departure(parsed_data["Flight IATA"])
             if flight_details:
                 st.subheader("Flight Departure Details")
                 st.json(flight_details)
 
-                # Validate flight details
                 validation_results = validate_flight(flight_details, parsed_data)
-                if validation_results:
-                    has_error = True
-                    for alert in validation_results:
-                        st.markdown(f"<div class='alert'>{alert}</div>", unsafe_allow_html=True)
-                else:
-                    is_valid = True
-                    st.markdown("<div class='success'>Flight details are valid!</div>", unsafe_allow_html=True)
+                for message in validation_results:
+                    st.error(message) if "Alert" in message else st.success(message)
             else:
-                has_error = True
-                st.markdown("<div class='alert'>No departure details found for this flight.</div>", unsafe_allow_html=True)
+                st.error("No departure details found.")
         else:
-            has_error = True
-            st.markdown(f"<div class='alert'>{error}</div>", unsafe_allow_html=True)
+            st.error(error)
+        st.session_state["last_scan_time"] = datetime.now()  # Record the scan time
 
-        # Delay for 5 seconds before clearing the UI
-        time.sleep(5)
+# Check if 5 seconds have passed since the last scan
+if st.session_state["last_scan_time"]:
+    elapsed_time = (datetime.now() - st.session_state["last_scan_time"]).total_seconds()
+    if elapsed_time > 5:
+        st.session_state["barcode_data"] = ""  # Clear the input field
+        st.session_state["last_scan_time"] = None  # Reset the scan time
         st.experimental_rerun()
-
-    # Set the state flags
-    st.session_state["has_error"] = has_error
-    st.session_state["is_valid"] = is_valid
 
 # Text input for barcode scanning with automatic processing
 st.text_input(
