@@ -112,10 +112,13 @@ if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
 if "has_error" not in st.session_state:
     st.session_state["has_error"] = False
+if "is_valid" not in st.session_state:
+    st.session_state["is_valid"] = False
 
 # Function to process the scanned barcode
 def process_scan():
     has_error = False
+    is_valid = False
     if st.session_state["barcode_data"]:
         # Parse the barcode
         parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
@@ -136,6 +139,7 @@ def process_scan():
                     for alert in validation_results:
                         st.markdown(f"<div class='alert'>{alert}</div>", unsafe_allow_html=True)
                 else:
+                    is_valid = True
                     st.markdown("<div class='success'>Flight details are valid!</div>", unsafe_allow_html=True)
             else:
                 has_error = True
@@ -147,16 +151,28 @@ def process_scan():
         # Reset the barcode data
         st.session_state["barcode_data"] = ""
 
-    # Set the error flag
+    # Set the state flags
     st.session_state["has_error"] = has_error
+    st.session_state["is_valid"] = is_valid
 
-# Apply a red background if there's an error
+# Apply dynamic background colors
 if st.session_state["has_error"]:
     st.markdown(
         """
         <style>
         .stApp {
             background-color: #ffcccc;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+elif st.session_state["is_valid"]:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #ccffcc;
         }
         </style>
         """,
