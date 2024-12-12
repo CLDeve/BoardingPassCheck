@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 from datetime import datetime, timedelta
+import time  # For adding delay
 
 # API Configuration
 API_KEY = '56e9c3-1bef36'  # Your Aviation Edge API key
@@ -109,14 +110,6 @@ def validate_flight(flight_details, boarding_pass_details):
 
     return validation_messages
 
-# Initialize session state
-if "barcode_data" not in st.session_state:
-    st.session_state["barcode_data"] = ""
-if "has_error" not in st.session_state:
-    st.session_state["has_error"] = False
-if "is_valid" not in st.session_state:
-    st.session_state["is_valid"] = False
-
 # Function to process the scanned barcode
 def process_scan():
     has_error = False
@@ -147,55 +140,13 @@ def process_scan():
             has_error = True
             st.markdown(f"<div class='alert'>{error}</div>", unsafe_allow_html=True)
 
-        # Reset the barcode data
-        st.session_state["barcode_data"] = ""
+        # Delay for 5 seconds before clearing the UI
+        time.sleep(5)
+        st.experimental_rerun()
 
     # Set the state flags
     st.session_state["has_error"] = has_error
     st.session_state["is_valid"] = is_valid
-
-# Apply dynamic background colors
-if st.session_state["has_error"]:
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background-color: #ffcccc;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-elif st.session_state["is_valid"]:
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background-color: #ccffcc;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# Add CSS styles for larger messages
-st.markdown(
-    """
-    <style>
-    .alert {
-        color: red;
-        font-size: 24px;
-        font-weight: bold;
-    }
-    .success {
-        color: green;
-        font-size: 24px;
-        font-weight: bold;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 
 # Text input for barcode scanning with automatic processing
 st.text_input(
@@ -203,17 +154,4 @@ st.text_input(
     placeholder="Place the cursor here and scan your boarding pass...",
     key="barcode_data",
     on_change=process_scan,
-)
-
-# Inject JavaScript to keep the cursor in the input field
-st.markdown(
-    """
-    <script>
-    const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
-    if (input) {
-        input.focus();
-    }
-    </script>
-    """,
-    unsafe_allow_html=True,
 )
