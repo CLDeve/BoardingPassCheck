@@ -148,7 +148,7 @@ def process_scan():
             has_error = True
             st.error(error)
 
-        # Clear the barcode data for the next scan
+        # Reset the barcode data
         st.session_state["barcode_data"] = ""
 
     # Set the error flag
@@ -173,4 +173,17 @@ st.text_input(
     placeholder="Place the cursor here and scan your boarding pass...",
     key="barcode_data",
     on_change=process_scan,
+)
+
+# Inject JavaScript to keep the cursor in the input field
+st.markdown(
+    """
+    <script>
+    const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
+    if (input) {
+        input.focus();
+    }
+    </script>
+    """,
+    unsafe_allow_html=True,
 )
