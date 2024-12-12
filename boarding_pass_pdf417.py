@@ -32,10 +32,10 @@ def parse_iata_barcode(barcode):
         return None, f"Error parsing barcode: {e}"
 
 # Function to fetch flight departure details from API
-def fetch_flight_departure(flight_iata):
+def fetch_flight_departure(flight_iata, departure_airport="SIN"):
     params = {
         "key": API_KEY,
-        "iataCode": flight_iata[:2],  # Extracting airport code from IATA
+        "iataCode": departure_airport,
         "type": "departure"
     }
     try:
@@ -52,58 +52,131 @@ def fetch_flight_departure(flight_iata):
                     "Destination": flight.get("arrival", {}).get("iataCode", "N/A"),
                     "Scheduled Departure Time": flight.get("departure", {}).get("scheduledTime", "N/A"),
                     "Status": flight.get("status", "N/A"),
+                    "Departure Airport": departure_airport,
                 }
         return None
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching departure details: {e}")
         return None
 
-# Function to process validation and display results
-def process_scan():
-    barcode_data = st.session_state.get("barcode_data", "")
-    if barcode_data:
+# Function to validate flight details
+def validate_flight(flight_details, boarding_pass_details):
+    validation_messages = []
+
+    # Check if departure is from SIN
+    if flight_details.get("Departure Airport") != "SIN":
+        validation_messages.append("Alert: Departure is not from SIN!")
+
+    # Get and validate the scheduled departure time
+    scheduled_time = flight_details.get("Scheduled Departure Time", "")
+    if not scheduled_time:
+        validation_messages.append("Alert: Scheduled Departure Time is missing!")
+        return validation_messages
+
+    try:
+        # Remove fractional seconds if present
+        scheduled_time = scheduled_time.split(".")[0]
+        flight_datetime = datetime.strptime(scheduled_time.replace("T", " "), "%Y-%m-%d %H:%M:%S")
+    except ValueError as e:
+        validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
+        return validation_messages
+
+    # Check if flight date matches boarding pass date
+    flight_date = flight_datetime.date()
+    boarding_pass_date = boarding_pass_details.get("Departure Date")
+    if flight_date != boarding_pass_date:
+        validation_messages.append(
+            f"Alert: Boarding pass date ({boarding_pass_date}) does not match flight date ({flight_date})!"
+        )
+
+    # Check if flight date is today
+    current_date = datetime.now().date()
+    if flight_date != current_date:
+        validation_messages.append(
+            f"Alert: Flight date is not today! (Flight Date: {flight_date}, Today's Date: {current_date})"
+        )
+
+    # Check if flight is within the next 24 hours
+    current_time = datetime.now()
+    time_difference = flight_datetime - current_time
+    if time_difference.total_seconds() < 0:
+        validation_messages.append(f"Alert: The flight has already departed! (Flight Time: {flight_datetime})")
+    elif time_difference.total_seconds() > 86400:  # 24 hours in seconds
+        validation_messages.append(
+            f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime}, Current Time: {current_time})"
+        )
+
+    return validation_messages
+
+# Streamlit Interface
+st.title("Boarding Pass Validator with Flight Checks")
+
+# Initialize session state for the barcode field
+if "barcode_data" not in st.session_state:
+    st.session_state["barcode_data"] = ""
+
+if "has_error" not in st.session_state:
+    st.session_state["has_error"] = False
+
+# Function to process validation and reset barcode field
+def process_scan_and_reset():
+    has_error = False
+    if st.session_state["barcode_data"]:
         # Parse the barcode
-        parsed_data, error = parse_iata_barcode(barcode_data)
+        parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
         if parsed_data:
             st.subheader("Parsed Boarding Pass Details")
             st.json(parsed_data)
 
-            # Fetch departure details
+            # Search departure details
             flight_details = fetch_flight_departure(parsed_data["Flight IATA"])
             if flight_details:
                 st.subheader("Flight Departure Details")
                 st.json(flight_details)
-                st.success("Validation Successful!")
+
+                # Validate flight details
+                validation_results = validate_flight(flight_details, parsed_data)
+                if validation_results:
+                    has_error = True
+                    for alert in validation_results:
+                        st.error(alert)
+                else:
+                    st.success("Flight details are valid!")
             else:
-                st.warning("No departure details found for this flight. The boarding pass may still be valid.")
+                has_error = True
+                st.error("No departure details found for this flight.")
         else:
+            has_error = True
             st.error(error)
+    else:
+        has_error = True
+        st.error("Please scan a barcode first.")
 
-        # Clear the barcode field
-        st.session_state["barcode_data"] = ""
+    # Set the global error flag
+    st.session_state["has_error"] = has_error
 
-# Initialize Streamlit app
-st.title("Boarding Pass Validator with Flight Details")
+    # Reset the barcode field
+    st.session_state["barcode_data"] = ""
 
-# JavaScript to ensure cursor focus and auto-clear
-st.markdown("""
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const barcodeInput = document.querySelector("input[type='text']");
-        if (barcodeInput) {
-            barcodeInput.focus();
-            barcodeInput.addEventListener('input', () => {
-                setTimeout(() => barcodeInput.value = "", 1000);  // Clear input after 1 second
-            });
+# Apply a red background if there's an error
+if st.session_state["has_error"]:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: red;
         }
-    });
-</script>
-""", unsafe_allow_html=True)
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # Barcode input field
-st.text_input(
+barcode_data = st.text_input(
     "Scan the barcode here:",
     placeholder="Place the cursor here and scan your boarding pass...",
-    key="barcode_data",
-    on_change=process_scan
+    key="barcode_data"
 )
+
+# Button to validate and reset the barcode field
+st.button("Scan and Validate", on_click=process_scan_and_reset)
