@@ -111,16 +111,12 @@ def validate_flight(flight_details, boarding_pass_details):
 # Streamlit Interface
 st.title("Boarding Pass Validator with Flight Checks")
 
-# Initialize session state for the barcode field
+# Initialize session state
 if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
 
-if "has_error" not in st.session_state:
-    st.session_state["has_error"] = False
-
-# Function to process validation and reset barcode field
-def process_scan_and_reset():
-    has_error = False
+# Function to process the scanned barcode
+def process_scan():
     if st.session_state["barcode_data"]:
         # Parse the barcode
         parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
@@ -128,7 +124,7 @@ def process_scan_and_reset():
             st.subheader("Parsed Boarding Pass Details")
             st.json(parsed_data)
 
-            # Search departure details
+            # Fetch flight departure details
             flight_details = fetch_flight_departure(parsed_data["Flight IATA"])
             if flight_details:
                 st.subheader("Flight Departure Details")
@@ -137,46 +133,22 @@ def process_scan_and_reset():
                 # Validate flight details
                 validation_results = validate_flight(flight_details, parsed_data)
                 if validation_results:
-                    has_error = True
                     for alert in validation_results:
                         st.error(alert)
                 else:
                     st.success("Flight details are valid!")
             else:
-                has_error = True
                 st.error("No departure details found for this flight.")
         else:
-            has_error = True
             st.error(error)
-    else:
-        has_error = True
-        st.error("Please scan a barcode first.")
 
-    # Set the global error flag
-    st.session_state["has_error"] = has_error
-
-    # Reset the barcode field
-    st.session_state["barcode_data"] = ""
-
-# Apply a red background if there's an error
-if st.session_state["has_error"]:
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background-color: red;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# Barcode input field
-barcode_data = st.text_input(
+# Text input for barcode scanning with automatic processing
+st.text_input(
     "Scan the barcode here:",
     placeholder="Place the cursor here and scan your boarding pass...",
-    key="barcode_data"
+    key="barcode_data",
+    on_change=process_scan,
 )
 
-# Button to validate and reset the barcode field
-st.button("Scan and Validate", on_click=process_scan_and_reset)
+# Keep the cursor in the input field
+st.experimental_set_query_params()
