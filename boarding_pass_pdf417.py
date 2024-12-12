@@ -114,9 +114,12 @@ st.title("Boarding Pass Validator with Flight Checks")
 # Initialize session state
 if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
+if "has_error" not in st.session_state:
+    st.session_state["has_error"] = False
 
 # Function to process the scanned barcode
 def process_scan():
+    has_error = False
     if st.session_state["barcode_data"]:
         # Parse the barcode
         parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
@@ -133,17 +136,36 @@ def process_scan():
                 # Validate flight details
                 validation_results = validate_flight(flight_details, parsed_data)
                 if validation_results:
+                    has_error = True
                     for alert in validation_results:
                         st.error(alert)
                 else:
                     st.success("Flight details are valid!")
             else:
+                has_error = True
                 st.error("No departure details found for this flight.")
         else:
+            has_error = True
             st.error(error)
 
         # Clear the barcode data for the next scan
         st.session_state["barcode_data"] = ""
+
+    # Set the error flag
+    st.session_state["has_error"] = has_error
+
+# Apply a red background if there's an error
+if st.session_state["has_error"]:
+    st.markdown(
+        """
+        <style>
+        .stApp {
+            background-color: #ffcccc;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # Text input for barcode scanning with automatic processing
 st.text_input(
