@@ -108,22 +108,12 @@ def validate_flight(flight_details, boarding_pass_details):
 
     return validation_messages
 
-# Streamlit Interface
-st.title("Boarding Pass Validator with Flight Checks")
-
-# Initialize session state for the barcode field
-if "barcode_data" not in st.session_state:
-    st.session_state["barcode_data"] = ""
-
-if "has_error" not in st.session_state:
-    st.session_state["has_error"] = False
-
-# Function to process validation and reset barcode field
-def process_scan_and_reset():
-    has_error = False
-    if st.session_state["barcode_data"]:
+# Function to process validation
+def process_scan():
+    barcode_data = st.session_state["barcode_data"]
+    if barcode_data:
         # Parse the barcode
-        parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
+        parsed_data, error = parse_iata_barcode(barcode_data)
         if parsed_data:
             st.subheader("Parsed Boarding Pass Details")
             st.json(parsed_data)
@@ -137,46 +127,22 @@ def process_scan_and_reset():
                 # Validate flight details
                 validation_results = validate_flight(flight_details, parsed_data)
                 if validation_results:
-                    has_error = True
                     for alert in validation_results:
                         st.error(alert)
                 else:
                     st.success("Flight details are valid!")
             else:
-                has_error = True
                 st.error("No departure details found for this flight.")
         else:
-            has_error = True
             st.error(error)
-    else:
-        has_error = True
-        st.error("Please scan a barcode first.")
 
-    # Set the global error flag
-    st.session_state["has_error"] = has_error
+# Streamlit Interface
+st.title("Boarding Pass Validator with Flight Checks")
 
-    # Reset the barcode field
-    st.session_state["barcode_data"] = ""
-
-# Apply a red background if there's an error
-if st.session_state["has_error"]:
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background-color: red;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# Barcode input field
-barcode_data = st.text_input(
+# Barcode input field with `on_change`
+st.text_input(
     "Scan the barcode here:",
     placeholder="Place the cursor here and scan your boarding pass...",
-    key="barcode_data"
+    key="barcode_data",
+    on_change=process_scan  # Automatically triggers validation when input changes
 )
-
-# Button to validate and reset the barcode field
-st.button("Scan and Validate", on_click=process_scan_and_reset)
