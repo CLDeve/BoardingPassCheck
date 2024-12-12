@@ -23,7 +23,7 @@ def parse_iata_barcode(barcode):
         return {
             "Passenger Name": passenger_name,
             "Flight IATA": flight_iata,
-            "Departure Date": flight_date.date(),
+            "Departure Date": flight_date.strftime("%d/%b/%Y"),  # Format date here
             "Seat Number": seat_number,
         }, None
     except Exception as e:
@@ -47,7 +47,10 @@ def fetch_flight_departure(flight_iata, departure_airport="SIN"):
                     "Flight Number": flight.get("flight", {}).get("iataNumber", "N/A"),
                     "Airline": flight.get("airline", {}).get("name", "N/A"),
                     "Destination": flight.get("arrival", {}).get("iataCode", "N/A"),
-                    "Scheduled Departure Time": flight.get("departure", {}).get("scheduledTime", "N/A"),
+                    "Scheduled Departure Time": datetime.strptime(
+                        flight.get("departure", {}).get("scheduledTime", "").split(".")[0],
+                        "%Y-%m-%dT%H:%M:%S"
+                    ).strftime("%d/%b/%Y %H:%M") if flight.get("departure", {}).get("scheduledTime") else "N/A",  # Format date and time here
                     "Status": flight.get("status", "N/A"),
                     "Departure Airport": departure_airport,
                 }
@@ -66,40 +69,42 @@ def validate_flight(flight_details, boarding_pass_details):
 
     # Get and validate the scheduled departure time
     scheduled_time = flight_details.get("Scheduled Departure Time", "")
-    if not scheduled_time:
+    if not scheduled_time or scheduled_time == "N/A":
         validation_messages.append("Alert: Scheduled Departure Time is missing!")
         return validation_messages
 
     try:
-        scheduled_time = scheduled_time.split(".")[0]
-        flight_datetime = datetime.strptime(scheduled_time.replace("T", " "), "%Y-%m-%d %H:%M:%S")
+        flight_datetime = datetime.strptime(scheduled_time, "%d/%b/%Y %H:%M")
     except ValueError as e:
         validation_messages.append(f"Alert: Unable to parse Scheduled Departure Time. Error: {e}")
         return validation_messages
 
     # Check if flight date matches boarding pass date
     flight_date = flight_datetime.date()
-    boarding_pass_date = boarding_pass_details.get("Departure Date")
+    boarding_pass_date = datetime.strptime(boarding_pass_details.get("Departure Date"), "%d/%b/%Y").date()
     if flight_date != boarding_pass_date:
         validation_messages.append(
-            f"Alert: Boarding pass date ({boarding_pass_date}) does not match flight date ({flight_date})!"
+            f"Alert: Boarding pass date ({boarding_pass_details['Departure Date']}) "
+            f"does not match flight date ({flight_datetime.strftime('%d/%b/%Y')})!"
         )
 
     # Check if flight date is today
     current_date = datetime.now().date()
     if flight_date != current_date:
         validation_messages.append(
-            f"Alert: Flight date is not today! (Flight Date: {flight_date}, Today's Date: {current_date})"
+            f"Alert: Flight date is not today! (Flight Date: {flight_datetime.strftime('%d/%b/%Y')}, "
+            f"Today's Date: {current_date.strftime('%d/%b/%Y')})"
         )
 
     # Check if flight is within the next 24 hours
     current_time = datetime.now()
     time_difference = flight_datetime - current_time
     if time_difference.total_seconds() < 0:
-        validation_messages.append(f"Alert: The flight has already departed! (Flight Time: {flight_datetime})")
-    elif time_difference.total_seconds() > 86400:
+        validation_messages.append(f"Alert: The flight has already departed! (Flight Time: {flight_datetime.strftime('%d/%b/%Y %H:%M')})")
+    elif time_difference.total_seconds() > 86400:  # 24 hours in seconds
         validation_messages.append(
-            f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime}, Current Time: {current_time})"
+            f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime.strftime('%d/%b/%Y %H:%M')}, "
+            f"Current Time: {current_time.strftime('%d/%b/%Y %H:%M')})"
         )
 
     return validation_messages
