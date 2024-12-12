@@ -148,8 +148,9 @@ def process_scan():
             has_error = True
             st.error(error)
 
-        # Clear the barcode data for the next scan
+        # Clear the barcode data for the next scan and rerun the app
         st.session_state["barcode_data"] = ""
+        st.experimental_rerun()
 
     # Set the error flag
     st.session_state["has_error"] = has_error
@@ -174,6 +175,3 @@ st.text_input(
     key="barcode_data",
     on_change=process_scan,
 )
-
-# Keep the cursor in the input field
-st.experimental_set_query_params()
