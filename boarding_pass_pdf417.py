@@ -116,9 +116,12 @@ if "has_error" not in st.session_state:
     st.session_state["has_error"] = False
 if "is_valid" not in st.session_state:
     st.session_state["is_valid"] = False
+if "is_checking" not in st.session_state:
+    st.session_state["is_checking"] = False
 
 # Function to process the scanned barcode
 def process_scan():
+    st.session_state["is_checking"] = True  # Set the state to checking
     has_error = False
     is_valid = False
     if st.session_state["barcode_data"]:
@@ -153,6 +156,18 @@ def process_scan():
     # Set the state flags
     st.session_state["has_error"] = has_error
     st.session_state["is_valid"] = is_valid
+    st.session_state["is_checking"] = False  # Reset checking state
+
+# Display "CHECKING" label while processing
+if st.session_state["is_checking"]:
+    st.markdown(
+        """
+        <div style="font-size: 48px; color: blue; text-align: center; font-weight: bold;">
+        CHECKING
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # Apply dynamic background colors
 if st.session_state["has_error"]:
@@ -204,17 +219,3 @@ st.text_input(
     key="barcode_data",
     on_change=process_scan,
 )
-
-# Inject JavaScript to keep the cursor in the input field
-st.markdown(
-    """
-    <script>
-    const input = window.parent.document.querySelector('input[data-testid="stTextInput"]');
-    if (input) {
-        input.focus();
-    }
-    </script>
-    """,
-    unsafe_allow_html=True,
-)
-
