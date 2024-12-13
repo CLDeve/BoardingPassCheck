@@ -103,7 +103,7 @@ def validate_flight(flight_details, boarding_pass_details):
         validation_messages.append("Alert: Please check Boarding Time. The time is more than one hour past!")
 
     # Check if flight is within the next 24 hours
-    if time_difference > 0 and time_difference <= 86400:  # Within the next 24 hours
+    if 0 < time_difference <= 86400:  # Within the next 24 hours
         validation_messages.append(
             f"Alert: Flight is not within the next 24 hours! (Flight Time: {flight_datetime.strftime('%d/%b/%Y %H:%M')}, "
             f"Current Time: {current_time.strftime('%d/%b/%Y %H:%M')})"
@@ -111,4 +111,38 @@ def validate_flight(flight_details, boarding_pass_details):
 
     return validation_messages
 
-# The rest of the code for processing scans and displaying results remains unchanged.
+# Initialize session state
+if "barcode_data" not in st.session_state:
+    st.session_state["barcode_data"] = ""
+
+# Function to process the scanned barcode
+def process_scan():
+    if st.session_state["barcode_data"]:
+        # Parse the barcode
+        parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
+        if parsed_data:
+            # Fetch flight departure details
+            flight_details = fetch_flight_departure(parsed_data["Flight IATA"])
+            if flight_details:
+                st.subheader("Flight Departure Details")
+                st.json(flight_details)
+
+                # Validate flight details
+                validation_results = validate_flight(flight_details, parsed_data)
+                for message in validation_results:
+                    st.error(message) if "Alert" in message else st.success(message)
+            else:
+                st.error("No departure details found for this flight.")
+        elif error:
+            st.error(error)
+
+        # Reset the barcode data
+        st.session_state["barcode_data"] = ""
+
+# Text input for barcode scanning with automatic processing
+st.text_input(
+    "Scan the barcode here:",
+    placeholder="Place the cursor here and scan your boarding pass...",
+    key="barcode_data",
+    on_change=process_scan,
+)
