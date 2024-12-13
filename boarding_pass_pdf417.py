@@ -112,107 +112,44 @@ def validate_flight(flight_details, boarding_pass_details):
 # Initialize session state
 if "barcode_data" not in st.session_state:
     st.session_state["barcode_data"] = ""
-if "has_error" not in st.session_state:
-    st.session_state["has_error"] = False
-if "is_valid" not in st.session_state:
-    st.session_state["is_valid"] = False
-if "is_checking" not in st.session_state:
-    st.session_state["is_checking"] = False
+if "is_waiting" not in st.session_state:
+    st.session_state["is_waiting"] = False
 
 # Function to process the scanned barcode
 def process_scan():
-    st.session_state["is_checking"] = True  # Set the state to checking
-    has_error = False
-    is_valid = False
+    st.session_state["is_waiting"] = True  # Set waiting state
     if st.session_state["barcode_data"]:
-        # Parse the barcode
+        # Simulate processing delay
         parsed_data, error = parse_iata_barcode(st.session_state["barcode_data"])
         if parsed_data:
-            # Fetch flight departure details
             flight_details = fetch_flight_departure(parsed_data["Flight IATA"])
             if flight_details:
                 st.subheader("Flight Departure Details")
                 st.json(flight_details)
-
-                # Validate flight details
                 validation_results = validate_flight(flight_details, parsed_data)
-                if validation_results:
-                    has_error = True
-                    for alert in validation_results:
-                        st.markdown(f"<div class='alert'>{alert}</div>", unsafe_allow_html=True)
-                else:
-                    is_valid = True
-                    st.markdown("<div class='success'>Flight details are valid!</div>", unsafe_allow_html=True)
+                for message in validation_results:
+                    st.error(message) if "Alert" in message else st.success(message)
             else:
-                has_error = True
-                st.markdown("<div class='alert'>No departure details found for this flight.</div>", unsafe_allow_html=True)
-        else:
-            has_error = True
-            st.markdown(f"<div class='alert'>{error}</div>", unsafe_allow_html=True)
+                st.error("No departure details found for this flight.")
+        elif error:
+            st.error(error)
 
-        # Reset the barcode data
-        st.session_state["barcode_data"] = ""
+        st.session_state["barcode_data"] = ""  # Clear barcode data
 
-    # Set the state flags
-    st.session_state["has_error"] = has_error
-    st.session_state["is_valid"] = is_valid
-    st.session_state["is_checking"] = False  # Reset checking state
+    st.session_state["is_waiting"] = False  # Reset waiting state
 
-# Display "CHECKING" label while processing
-if st.session_state["is_checking"]:
+# Display "PLEASE WAIT!" label if in waiting state
+if st.session_state["is_waiting"]:
     st.markdown(
         """
-        <div style="font-size: 48px; color: blue; text-align: center; font-weight: bold;">
-        CHECKING
+        <div style="font-size: 48px; color: orange; text-align: center; font-weight: bold;">
+        PLEASE WAIT!
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-# Apply dynamic background colors
-if st.session_state["has_error"]:
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background-color: #ffcccc;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-elif st.session_state["is_valid"]:
-    st.markdown(
-        """
-        <style>
-        .stApp {
-            background-color: #ccffcc;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# Add CSS styles for larger messages
-st.markdown(
-    """
-    <style>
-    .alert {
-        color: red;
-        font-size: 24px;
-        font-weight: bold;
-    }
-    .success {
-        color: green;
-        font-size: 24px;
-        font-weight: bold;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Text input for barcode scanning with automatic processing
+# Text input for barcode scanning
 st.text_input(
     "Scan the barcode here:",
     placeholder="Place the cursor here and scan your boarding pass...",
