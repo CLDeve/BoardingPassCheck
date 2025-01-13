@@ -3,8 +3,7 @@ import requests
 from datetime import datetime, timedelta
 
 # API Configuration
-API_KEY = '56e9c3-1bef36'  # Your Aviation Edge API key
-BASE_URL = 'https://aviation-edge.com/v2/public/timetable'
+
 
 # Helper function to parse IATA boarding pass barcode
 def parse_iata_barcode(barcode):
